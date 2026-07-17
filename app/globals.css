@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color: #1c0007; background: #fff; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; overflow-x: hidden; }
+::selection { background: #951d32; color: white; }
+img { user-select: none; }
+
+@layer components {
+  .editorial-container { @apply mx-auto max-w-editorial px-5 sm:px-8 lg:px-12; }
+  .eyebrow { @apply text-[10px] font-semibold uppercase tracking-editorial; }
+  .hero-title { @apply font-serif text-5xl leading-[0.98] sm:text-7xl lg:text-8xl; }
+  .section-title { @apply font-serif text-4xl leading-none text-heading sm:text-5xl lg:text-6xl; }
+  .card-title { @apply font-serif text-2xl leading-tight text-heading sm:text-3xl; }
+  .button-primary { @apply inline-flex min-h-11 items-center justify-center bg-wine px-7 text-[10px] font-semibold uppercase tracking-editorial text-white transition hover:bg-heading; }
+}
+
+@keyframes category-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.category-marquee-track {
+  animation: category-marquee 38s linear infinite;
+  width: max-content;
+}
+
+.category-marquee-track:hover { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .category-marquee-track { animation: none; }
+}
