@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Facebook, Instagram, Linkedin, Youtube } from 'lucide-react';
+import { Instagram, Linkedin } from 'lucide-react';
 
 const editorialLinks = [
   ['Explore', [['Fashion & Style', '/categories/fashion'], ['Travel & Experiences', '/categories/travel'], ['Culture', '/categories/culture'], ['Design', '/categories/design'], ['Wellness', '/categories/wellness'], ['Automotive', '/categories/automotive']]],
@@ -10,8 +10,6 @@ const editorialLinks = [
 
 const socialLinks = [
   ['Instagram', 'https://www.instagram.com/global_luxury_reporter', Instagram],
-  ['Facebook', 'https://www.facebook.com/', Facebook],
-  ['YouTube', 'https://www.youtube.com/', Youtube],
   ['LinkedIn', 'https://www.linkedin.com/company/global-luxury-reporter', Linkedin]
 ];
 
