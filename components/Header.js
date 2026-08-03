@@ -47,7 +47,7 @@ export default function Header({ categories = [], overlay = false }) {
         <div className="editorial-container hidden h-28 grid-cols-[1fr_auto_1fr] items-center xl:grid">
           <nav className="flex items-center gap-8 text-[10px] font-semibold uppercase tracking-editorial">
             <div className="relative">
-              <button onClick={() => setCategoriesOpen(!categoriesOpen)} aria-expanded={categoriesOpen} className="flex items-center gap-1.5 transition hover:text-brand">Categories <ChevronDown size={13} /></button>
+              <button onClick={() => setCategoriesOpen(!categoriesOpen)} aria-expanded={categoriesOpen} className="flex items-center gap-1.5 transition hover:text-brand">CATEGORIES <ChevronDown size={13} /></button>
               {categoriesOpen && (
                 <div className="absolute left-0 top-9 grid min-w-64 gap-1 border border-ink/10 bg-white p-3 text-ink shadow-[0_18px_50px_rgba(28,0,7,.14)]">
                   {categories.map((category) => <Link key={category.slug} href={`/categories/${category.slug}`} onClick={() => setCategoriesOpen(false)} className="px-4 py-3 transition hover:bg-cream hover:text-brand">{category.name}</Link>)}
@@ -65,8 +65,8 @@ export default function Header({ categories = [], overlay = false }) {
           <div className="flex items-center justify-end gap-7 text-[10px] font-semibold uppercase tracking-editorial">
             <Link href="/contact" className="transition hover:text-brand">Contact</Link>
             <div className="flex items-center gap-4 border-l border-current/20 pl-6">
-              <Link href="#" aria-label="Instagram" className="transition hover:text-brand"><Instagram size={16} strokeWidth={1.6} /></Link>
-              <Link href="#" aria-label="LinkedIn" className="transition hover:text-brand"><Linkedin size={16} strokeWidth={1.6} /></Link>
+              <a href="https://www.instagram.com/global_luxury_reporter" target="_blank" rel="noreferrer" aria-label="Instagram" className="transition hover:text-brand"><Instagram size={16} strokeWidth={1.6} /></a>
+              <a href="https://www.linkedin.com/company/global-luxury-reporter" target="_blank" rel="noreferrer" aria-label="LinkedIn" className="transition hover:text-brand"><Linkedin size={16} strokeWidth={1.6} /></a>
             </div>
             <button onClick={() => setSearchOpen(true)} aria-label="Open search" className="transition hover:text-brand"><Search size={18} strokeWidth={1.6} /></button>
           </div>
@@ -89,7 +89,7 @@ export default function Header({ categories = [], overlay = false }) {
         </div>
         <nav className="h-[calc(100%-6rem)] overflow-y-auto px-6 py-9 sm:px-10">
           <div className="divide-y divide-white/15">{categories.map((category) => <Link key={category.slug} href={`/categories/${category.slug}`} onClick={() => setMenuOpen(false)} className="flex items-center justify-between py-4 font-serif text-3xl"><span>{category.name}</span><span className="text-sm text-white/35">→</span></Link>)}</div>
-          <div className="mt-10 flex flex-wrap gap-x-7 gap-y-4 text-[10px] font-semibold uppercase tracking-editorial"><Link href="/categories/all" onClick={() => setMenuOpen(false)}>Latest</Link><Link href="/about" onClick={() => setMenuOpen(false)}>About</Link><Link href="/contact" onClick={() => setMenuOpen(false)}>Contact</Link><Link href="#" aria-label="Instagram"><Instagram size={17} /></Link><Link href="#" aria-label="LinkedIn"><Linkedin size={17} /></Link></div>
+          <div className="mt-10 flex flex-wrap gap-x-7 gap-y-4 text-[10px] font-semibold uppercase tracking-editorial"><Link href="/categories/all" onClick={() => setMenuOpen(false)}>Latest</Link><Link href="/about" onClick={() => setMenuOpen(false)}>About</Link><Link href="/contact" onClick={() => setMenuOpen(false)}>Contact</Link><a href="https://www.instagram.com/global_luxury_reporter" target="_blank" rel="noreferrer" aria-label="Instagram"><Instagram size={17} /></a><a href="https://www.linkedin.com/company/global-luxury-reporter" target="_blank" rel="noreferrer" aria-label="LinkedIn"><Linkedin size={17} /></a></div>
         </nav>
       </div>
 

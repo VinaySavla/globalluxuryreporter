@@ -9,10 +9,10 @@ const editorialLinks = [
 ];
 
 const socialLinks = [
-  ['Instagram', 'https://www.instagram.com/', Instagram],
+  ['Instagram', 'https://www.instagram.com/global_luxury_reporter', Instagram],
   ['Facebook', 'https://www.facebook.com/', Facebook],
   ['YouTube', 'https://www.youtube.com/', Youtube],
-  ['LinkedIn', 'https://www.linkedin.com/', Linkedin]
+  ['LinkedIn', 'https://www.linkedin.com/company/global-luxury-reporter', Linkedin]
 ];
 
 export default function Footer() {

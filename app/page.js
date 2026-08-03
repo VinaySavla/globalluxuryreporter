@@ -33,7 +33,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="py-24 lg:py-36">
+        <section style={{ backgroundColor: 'rgb(247 242 236 / var(--tw-bg-opacity, 1))' }} className="pb-20 pt-12 lg:pb-28 lg:pt-16">
           <div className="editorial-container">
             <h2 className="section-title">Categories</h2>
             <p className="mt-6 max-w-3xl text-sm leading-7 text-ink/65">From private escapes to the ateliers defining our time, discover reporting shaped by curiosity, discernment and a global point of view.</p>
