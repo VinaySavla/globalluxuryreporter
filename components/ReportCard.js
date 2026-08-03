@@ -16,7 +16,7 @@ export default function ReportCard({ report, priority = false, className = '', v
   return (
     <article className={`group ${className}`}>
       <Link href={`/reports/${report.slug}`} className="block overflow-hidden bg-parchment">
-        <div className={`relative ${feature ? 'aspect-[4/5] lg:aspect-[5/6]' : 'aspect-[4/3]'}`}><Image src={report.cover_image} alt={report.cover_alt || report.title} fill priority={priority} sizes={feature ? '(max-width: 1024px) 100vw, 55vw' : '(max-width: 768px) 100vw, 33vw'} className="object-cover transition duration-700 ease-out group-hover:scale-105" /></div>
+        <div className={`relative ${feature ? 'aspect-[16/10]' : 'aspect-[4/3]'}`}><Image src={report.cover_image} alt={report.cover_alt || report.title} fill priority={priority} sizes={feature ? '(max-width: 1024px) 100vw, 52vw' : '(max-width: 768px) 100vw, 33vw'} className="object-cover transition duration-700 ease-out group-hover:scale-105" /></div>
       </Link>
       <div className="pt-5">
         <Link href={`/categories/${report.category?.slug}`} className="eyebrow text-heading">{report.category?.name}</Link>

@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { Facebook, Instagram, Linkedin, Youtube } from 'lucide-react';
 
@@ -11,7 +12,9 @@ export default function Footer() {
   return (
     <footer className="bg-ink text-white/70">
       <div className="editorial-container py-16 lg:py-20">
-        <Link href="/" className="block border-b border-white/15 pb-12 font-serif text-[11vw] uppercase leading-[.72] tracking-[.04em] text-white lg:text-[8.2rem]">Global Luxury<br />Reporter</Link>
+        <Link href="/" aria-label="Global Luxury Reporter home" className="flex justify-center border-b border-white/15 pb-12">
+          <Image src="/GLR-Logo-dp.png" alt="Global Luxury Reporter" width={176} height={176} className="h-36 w-36 object-cover lg:h-44 lg:w-44" />
+        </Link>
         <div className="grid gap-12 py-14 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr]">
           <div><p className="eyebrow text-white/45">Independent perspective</p><p className="mt-5 max-w-sm font-serif text-2xl leading-snug text-white">Reporting on the people, places and ideas shaping a more considered world of luxury.</p><div className="mt-8 flex gap-5"><Instagram size={18} /><Facebook size={18} /><Youtube size={19} /><Linkedin size={18} /></div></div>
           {editorialLinks.map(([title, links]) => <div key={title}><h3 className="eyebrow text-white">{title}</h3><ul className="mt-5 space-y-3 text-xs">{links.map(([label, href]) => <li key={label}><Link href={href} className="transition hover:text-white">{label}</Link></li>)}</ul></div>)}
