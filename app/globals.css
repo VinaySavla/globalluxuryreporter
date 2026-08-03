@@ -30,6 +30,18 @@ img { user-select: none; }
 
 .category-marquee-track:hover { animation-play-state: paused; }
 
+@media (max-width: 767px) {
+  .category-marquee-viewport {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+  .category-marquee-viewport::-webkit-scrollbar { display: none; }
+  .category-marquee-track { animation: none; }
+  .category-marquee-track > [aria-hidden='true'] { display: none; }
+  .category-marquee-track article { scroll-snap-align: start; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .category-marquee-track { animation: none; }
 }

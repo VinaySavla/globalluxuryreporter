@@ -1,19 +1,22 @@
 import Link from 'next/link';
 import { Facebook, Instagram, Linkedin, Youtube } from 'lucide-react';
 
-const columns = [
-  ['Customer Services', ['Contact Us', 'Track your Order', 'Shipping & Returns', 'Frequently Asked Questions', 'Schedule an appointment']],
-  ['About Us', ['Origins', 'Our Purpose', 'Careers', 'Sustainability', 'Giving Back']],
-  ['Material Care', ['Jewelry Repair', 'Ring Sizing', 'Metal Allergy Resources', 'Styling Tips']],
-  ['Main Locations', ['Chicago, IL', 'San Francisco, CA', 'New York, NY', 'Seattle, WA']]
+const editorialLinks = [
+  ['Explore', [['Fashion & Style', '/categories/fashion'], ['Travel & Experiences', '/categories/travel'], ['Culture', '/categories/culture'], ['Design', '/categories/design'], ['Wellness', '/categories/wellness'], ['Automotive', '/categories/automotive']]],
+  ['The Journal', [['Latest Reports', '/categories/all'], ['About GLR', '/about'], ['Our Mission', '/about'], ['Global Reach', '/about'], ['Contact', '/contact']]],
+  ['Information', [['Editorial Standards', '#'], ['Contributors', '#'], ['Privacy Policy', '#'], ['Terms of Use', '#'], ['Cookie Policy', '#']]]
 ];
 
 export default function Footer() {
   return (
-    <footer className="bg-ink text-white/75">
-      <div className="mx-auto max-w-editorial px-6 py-16 sm:px-8 lg:px-12 lg:py-20">
-        <div className="grid grid-cols-2 gap-10 sm:grid-cols-4 lg:gap-16">{columns.map(([title, links]) => <div key={title}><h3 className="mb-5 font-serif text-sm uppercase tracking-wide text-white">{title}</h3><ul className="space-y-3 text-[11px]">{links.map((link) => <li key={link}><Link href={link === 'Contact Us' ? '/contact' : '#'} className="transition hover:text-white">{link}</Link></li>)}</ul></div>)}</div>
-        <div className="mt-16 flex flex-col gap-5 border-t border-white/10 pt-7 text-[9px] uppercase tracking-wider md:flex-row md:items-center md:justify-between"><span>© 2026 Global Luxury Reporter</span><div className="flex gap-5 text-white/70"><Instagram size={17} /><Facebook size={17} /><Youtube size={18} /><Linkedin size={17} /></div><span>Privacy Policy &nbsp; · &nbsp; Terms of Use &nbsp; · &nbsp; Cookies</span></div>
+    <footer className="bg-ink text-white/70">
+      <div className="editorial-container py-16 lg:py-20">
+        <Link href="/" className="block border-b border-white/15 pb-12 font-serif text-[11vw] uppercase leading-[.72] tracking-[.04em] text-white lg:text-[8.2rem]">Global Luxury<br />Reporter</Link>
+        <div className="grid gap-12 py-14 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr]">
+          <div><p className="eyebrow text-white/45">Independent perspective</p><p className="mt-5 max-w-sm font-serif text-2xl leading-snug text-white">Reporting on the people, places and ideas shaping a more considered world of luxury.</p><div className="mt-8 flex gap-5"><Instagram size={18} /><Facebook size={18} /><Youtube size={19} /><Linkedin size={18} /></div></div>
+          {editorialLinks.map(([title, links]) => <div key={title}><h3 className="eyebrow text-white">{title}</h3><ul className="mt-5 space-y-3 text-xs">{links.map(([label, href]) => <li key={label}><Link href={href} className="transition hover:text-white">{label}</Link></li>)}</ul></div>)}
+        </div>
+        <div className="flex flex-col gap-3 border-t border-white/15 pt-6 text-[9px] uppercase tracking-editorial sm:flex-row sm:justify-between"><span>© 2026 Global Luxury Reporter</span><span>India · Reporting globally</span></div>
       </div>
     </footer>
   );
