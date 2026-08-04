@@ -1,4 +1,5 @@
 import { Cormorant_Garamond, Poppins } from 'next/font/google';
+import EmailRegistrationModal from '@/components/EmailRegistrationModal';
 import './globals.css';
 
 const cormorant = Cormorant_Garamond({ subsets: ['latin'], variable: '--font-cormorant', weight: ['400', '500', '600', '700'], display: 'swap' });
@@ -10,5 +11,5 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
-  return <html lang="en"><body className={`${cormorant.variable} ${poppins.variable} font-sans text-ink antialiased`}>{children}</body></html>;
+  return <html lang="en"><body className={`${cormorant.variable} ${poppins.variable} font-sans text-ink antialiased`}>{children}<EmailRegistrationModal /></body></html>;
 }
