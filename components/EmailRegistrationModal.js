@@ -1,11 +1,9 @@
 'use client';
 
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, X } from 'lucide-react';
-
-const STORAGE_KEY = 'glr-email-registration-v1';
-const DISMISSAL_DAYS = 7;
 
 export default function EmailRegistrationModal() {
   const [open, setOpen] = useState(false);
@@ -13,24 +11,18 @@ export default function EmailRegistrationModal() {
   const [status, setStatus] = useState('idle');
   const [message, setMessage] = useState('');
   const inputRef = useRef(null);
+  const pathname = usePathname();
 
   useEffect(() => {
-    let shouldShow = true;
-    try {
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      if (stored?.registered) shouldShow = false;
-      if (stored?.dismissedAt) {
-        const elapsed = Date.now() - Number(stored.dismissedAt);
-        shouldShow = elapsed > DISMISSAL_DAYS * 24 * 60 * 60 * 1000;
-      }
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-
-    if (!shouldShow) return undefined;
-    const timer = window.setTimeout(() => setOpen(true), 1800);
+    if (pathname !== '/') return undefined;
+    const timer = window.setTimeout(() => {
+      setEmail('');
+      setMessage('');
+      setStatus('idle');
+      setOpen(true);
+    }, 3000);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     const reopen = () => {
@@ -59,7 +51,6 @@ export default function EmailRegistrationModal() {
   }, [open]);
 
   const dismiss = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ dismissedAt: Date.now() }));
     setOpen(false);
   };
 
@@ -75,7 +66,6 @@ export default function EmailRegistrationModal() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Registration failed.');
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ registered: true, email }));
       setStatus('success');
       setMessage(result.message || 'Welcome to Global Luxury Reporter.');
     } catch (error) {
