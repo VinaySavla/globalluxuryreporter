@@ -33,6 +33,17 @@ export default function EmailRegistrationModal() {
   }, []);
 
   useEffect(() => {
+    const reopen = () => {
+      setEmail('');
+      setMessage('');
+      setStatus('idle');
+      setOpen(true);
+    };
+    window.addEventListener('glr:open-registration', reopen);
+    return () => window.removeEventListener('glr:open-registration', reopen);
+  }, []);
+
+  useEffect(() => {
     if (!open) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';

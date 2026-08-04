@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Instagram, Linkedin } from 'lucide-react';
+import OpenRegistrationButton from './OpenRegistrationButton';
 
 const editorialLinks = [
   ['Explore', [['Fashion & Style', '/categories/fashion'], ['Travel & Experiences', '/categories/travel'], ['Culture', '/categories/culture'], ['Design', '/categories/design'], ['Wellness', '/categories/wellness'], ['Automotive', '/categories/automotive']]],
@@ -29,6 +30,7 @@ export default function Footer() {
                   <Icon size={17} strokeWidth={1.7} />
                 </a>
               ))}
+              <OpenRegistrationButton />
             </div>
           </div>
 
