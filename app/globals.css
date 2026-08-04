@@ -23,6 +23,25 @@ img { user-select: none; }
   to { transform: translateX(-50%); }
 }
 
+@keyframes registration-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes registration-panel-in {
+  from { opacity: 0; transform: translateY(30px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.registration-backdrop {
+  animation: registration-backdrop-in 360ms ease-out both;
+}
+
+.registration-panel {
+  animation: registration-panel-in 520ms cubic-bezier(0.22, 1, 0.36, 1) 40ms both;
+  transform-origin: center bottom;
+}
+
 .category-marquee-track {
   animation: category-marquee 38s linear infinite;
   width: max-content;
@@ -44,4 +63,6 @@ img { user-select: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .category-marquee-track { animation: none; }
+  .registration-backdrop,
+  .registration-panel { animation: none; }
 }

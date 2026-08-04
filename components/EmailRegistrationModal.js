@@ -77,8 +77,8 @@ export default function EmailRegistrationModal() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-ink/80 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) dismiss(); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby="email-registration-title" aria-describedby="email-registration-description" className="relative w-full max-w-3xl overflow-hidden bg-cream shadow-[0_30px_100px_rgba(28,0,7,.45)]">
+    <div className="registration-backdrop fixed inset-0 z-[100] grid place-items-center bg-ink/80 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) dismiss(); }}>
+      <section role="dialog" aria-modal="true" aria-labelledby="email-registration-title" aria-describedby="email-registration-description" className="registration-panel relative w-full max-w-3xl overflow-hidden bg-cream shadow-[0_30px_100px_rgba(28,0,7,.45)]">
         <button type="button" onClick={dismiss} aria-label="Close registration dialog" className="absolute right-4 top-4 z-10 grid h-10 w-10 place-items-center border border-ink/15 bg-cream/90 text-heading transition hover:bg-heading hover:text-white"><X size={18} /></button>
 
         <div className="grid md:grid-cols-[.8fr_1.2fr]">
