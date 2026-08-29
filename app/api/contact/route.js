@@ -38,14 +38,12 @@ export async function POST(request) {
     const payload = {
       name: clean(body.name),
       email: clean(body.email).toLowerCase(),
-      phone: clean(body.phone),
       message: clean(body.message)
     };
 
     const invalid =
       payload.name.length < 2 || payload.name.length > 100 ||
       !validEmail(payload.email) || payload.email.length > 254 ||
-      payload.phone.length > 30 ||
       payload.message.length < 10 || payload.message.length > 3000;
 
     if (invalid) {

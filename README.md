@@ -42,4 +42,4 @@ No `NEXT_PUBLIC_API_URL`, Express server, CORS configuration, or second Vercel p
 
 - `reports`: `title`, `slug`, `excerpt`, `content`, `category` (M2O), `cover_image`, `author`, `published_at`, `featured`, `status`
 - `categories`: `name`, `slug`, `description`, `cover_image`, `sort`
-- `inquiries`: `name`, `email`, `phone`, `message`, `status`
+- `inquiries`: `name`, `email`, `message`, `status`

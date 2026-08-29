@@ -89,7 +89,7 @@ export default function EmailRegistrationModal() {
           </div>
 
           <div className="px-6 py-10 sm:px-10 sm:py-12">
-            <Image src="/GLR-Logo-dp.png" alt="Global Luxury Reporter" width={72} height={72} className="h-16 w-16 object-cover" />
+            <Image src="/GLR-Logo-dp.png" alt="Global Luxury Reporter" width={96} height={96} className="h-20 w-20 object-cover sm:h-24 sm:w-24" />
             {status === 'success' ? (
               <div className="py-10">
                 <p className="eyebrow text-heading">Registration complete</p>
@@ -99,7 +99,7 @@ export default function EmailRegistrationModal() {
               </div>
             ) : (
               <>
-                <p className="eyebrow mt-8 text-heading">The GLR edit</p>
+                <p className="eyebrow mt-3 text-heading sm:mt-4">The GLR edit</p>
                 <h2 id="email-registration-title" className="mt-3 font-serif text-4xl leading-[.95] text-heading sm:text-5xl">Stay close to the world of luxury.</h2>
                 <p id="email-registration-description" className="mt-5 text-sm leading-7 text-ink/60">Register for carefully selected reports, cultural intelligence and exceptional destinations from Global Luxury Reporter.</p>
                 <form onSubmit={submit} className="mt-8">

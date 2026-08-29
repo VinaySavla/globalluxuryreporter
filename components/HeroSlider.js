@@ -33,9 +33,9 @@ export default function HeroSlider({ reports }) {
             <Image src={report.cover_image} alt={report.cover_alt || report.title} fill priority={index === 0} sizes="100vw" className="object-cover opacity-80" />
             <div className="absolute inset-0 bg-gradient-to-r from-ink/85 via-ink/30 to-ink/10" />
             <div className="editorial-container relative flex h-full items-end pb-20 pt-36 lg:pb-24 lg:pt-48">
-              <div className="max-w-4xl">
+              <div className="max-w-4xl pr-16 sm:pr-20 lg:pr-28">
                 <p className="eyebrow text-white/80">Featured · {report.category?.name}</p>
-                <h1 className="mt-5 max-w-4xl font-serif text-5xl leading-[.92] sm:text-7xl lg:text-[6.5rem]">{report.title}</h1>
+                <h1 className="mt-5 max-w-4xl text-balance font-serif text-[clamp(2.75rem,7vw,6.5rem)] leading-[.92]">{report.title}</h1>
                 <p className="mt-6 max-w-2xl text-sm leading-7 text-white/80">{report.excerpt}</p>
                 <div className="mt-8 flex items-center gap-6"><Link href={`/reports/${report.slug}`} className="border-b border-white pb-1 font-serif text-xl">Read the report</Link><span className="text-[9px] uppercase tracking-editorial text-white/55">{report.reading_time} min read</span></div>
               </div>
