@@ -10,16 +10,19 @@ export default async function HomePage() {
   const [categoryList, reportResult, featuredResult] = await Promise.all([
     getCategories(),
     getReports({ limit: 15 }),
-    getReports({ featured: true, limit: 3 })
+    getReports({ featured: true, unlimited: true })
   ]);
   const reports = reportResult.data;
-  const featured = featuredResult.data.length ? featuredResult.data : reports.slice(0, 3);
+  const featured = featuredResult.data.length ? featuredResult.data : reports;
   const editorPicks = reports.filter((report) => report.editor_pick).slice(0, 4);
+  const selectedEditorPicks = editorPicks.length ? editorPicks : reports.slice(0, 4);
   const popular = [...reports].sort((a, b) => b.popularity - a.popularity).slice(0, 5);
+  const structuredData = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Global Luxury Reporter', url: process.env.SITE_URL || 'http://localhost:3000', potentialAction: { '@type': 'SearchAction', target: `${process.env.SITE_URL || 'http://localhost:3000'}/search?q={search_term_string}`, 'query-input': 'required name=search_term_string' } };
 
   return (
-    <SiteShell overlayHeader>
-      <main>
+    <SiteShell overlayHeader categories={categoryList}>
+      <main id="main-content">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }} />
         <HeroSlider reports={featured} />
 
         <section className="editorial-container py-20 lg:py-28">
@@ -28,8 +31,7 @@ export default async function HomePage() {
             <Link href="/categories/all" className="hidden text-[10px] font-semibold uppercase tracking-editorial text-heading sm:block">All reports →</Link>
           </div>
           <div className="mt-10 grid gap-12 lg:grid-cols-[1.15fr_.85fr] lg:gap-16">
-            <ReportCard report={reports[3] || reports[0]} variant="feature" priority />
-            <div>{reports.slice(4, 8).map((report) => <ReportCard key={report.slug} report={report} variant="compact" />)}</div>
+            {reports.length ? <><ReportCard report={reports[3] || reports[0]} variant="feature" priority /><div>{reports.slice(4, 8).map((report) => <ReportCard key={report.slug} report={report} variant="compact" />)}</div></> : <p className="py-16 text-center font-serif text-3xl text-ink/70 lg:col-span-2">New reports are coming soon.</p>}
           </div>
         </section>
 
@@ -38,24 +40,22 @@ export default async function HomePage() {
             <h2 className="section-title">Categories</h2>
             <p className="mt-6 max-w-3xl text-sm leading-7 text-ink/65">From private escapes to the ateliers defining our time, discover reporting shaped by curiosity, discernment and a global point of view.</p>
           </div>
-          <div className="category-marquee-viewport mt-16 overflow-hidden">
+          <div className="category-marquee-viewport mt-16 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="category-marquee-track flex">
-              {[false, true].map((duplicate) => (
-                <div key={String(duplicate)} aria-hidden={duplicate || undefined} className="flex shrink-0 gap-16 pr-16 sm:gap-24 sm:pr-24">
+                <div className="flex shrink-0 gap-16 pr-16 sm:gap-24 sm:pr-24">
                   {categoryList.map((category) => (
-                    <article key={`${duplicate}-${category.slug}`} className="relative w-[320px] shrink-0 pb-16 sm:w-[400px]">
-                      <Link href={`/categories/${category.slug}`} tabIndex={duplicate ? -1 : undefined} className="group relative block aspect-[4/5] w-[82%] overflow-hidden bg-parchment">
-                        <Image src={category.cover_image} alt={`${category.name} editorial`} fill sizes="(max-width: 640px) 263px, 328px" className="object-cover transition duration-700 group-hover:scale-105" />
+                    <article key={category.slug} className="relative w-[320px] shrink-0 pb-16 sm:w-[400px]">
+                      <Link href={`/categories/${category.slug}`} className="group relative block aspect-[4/5] w-[82%] overflow-hidden bg-parchment">
+                        <Image src={category.cover_image} alt={`${category.name} editorial`} fill sizes="(max-width: 640px) 263px, 328px" unoptimized className="object-cover transition duration-700 group-hover:scale-105" />
                       </Link>
                       <div className="absolute bottom-0 right-0 w-[66%] bg-cream px-5 py-6 text-center shadow-[0_18px_40px_rgba(28,0,7,0.08)] sm:px-7 sm:py-8">
                         <h3 className="card-title">{category.name}</h3>
                         <p className="mt-3 text-[11px] leading-5 text-ink/65">{category.description}</p>
-                        <Link href={`/categories/${category.slug}`} tabIndex={duplicate ? -1 : undefined} className="button-primary mt-5">Explore</Link>
+                        <Link href={`/categories/${category.slug}`} className="button-primary mt-5">Explore</Link>
                       </div>
                     </article>
                   ))}
                 </div>
-              ))}
             </div>
           </div>
         </section>
@@ -68,10 +68,10 @@ export default async function HomePage() {
             </div>
 
             <div className="mt-10 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-4 xl:gap-6">
-              {editorPicks.map((report, index) => (
+              {selectedEditorPicks.map((report, index) => (
                 <article key={report.slug} className="group w-full shrink-0 snap-start sm:w-auto">
                   <Link href={`/reports/${report.slug}`} className="relative block aspect-[3/4] overflow-hidden bg-ink/25">
-                    <Image src={report.cover_image} alt={report.cover_alt || report.title} fill sizes="(max-width:640px) calc(100vw - 40px), (max-width:1280px) 50vw, 25vw" className="object-cover transition duration-700 group-hover:scale-105" />
+                    <Image src={report.cover_image} alt={report.cover_alt || report.title} fill sizes="(max-width:640px) calc(100vw - 40px), (max-width:1280px) 50vw, 25vw" unoptimized className="object-cover transition duration-700 group-hover:scale-105" />
                     <div className="absolute inset-0 bg-gradient-to-t from-ink/55 via-transparent to-ink/10" />
                     <span className="absolute left-5 top-5 grid h-10 w-10 place-items-center border border-white/45 font-serif text-xl">{String(index + 1).padStart(2, '0')}</span>
                   </Link>

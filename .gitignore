@@ -6,3 +6,5 @@ node_modules
 npm-debug.log*
 .DS_Store
 coverage
+directus/uploads/*
+!directus/uploads/.gitkeep

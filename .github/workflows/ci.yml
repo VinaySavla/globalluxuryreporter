@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --omit=dev
+      - run: npm run build
+        env:
+          DIRECTUS_URL: http://127.0.0.1:9
+          DIRECTUS_TOKEN: ci-build-token
+          USE_MOCK_DATA: "false"
+          ROBOTS_INDEXING: "false"
+      - run: docker compose -f directus/docker-compose.yml config --quiet
+        env:
+          DIRECTUS_SECRET: ci-secret
+          DIRECTUS_ADMIN_EMAIL: admin@example.com
+          DIRECTUS_ADMIN_PASSWORD: ci-password
+          DIRECTUS_ADMIN_TOKEN: ci-admin-token
+          DIRECTUS_SERVICE_TOKEN: ci-service-token
+          DB_HOST: database
+          DB_DATABASE: glr
+          DB_USER: glr
+          DB_PASSWORD: ci-database-password

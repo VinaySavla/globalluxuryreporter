@@ -1,0 +1,3 @@
+import Link from 'next/link';
+export const metadata = { title: 'Invalid email link', robots: { index: false, follow: false } };
+export default function InvalidSubscriptionPage() { return <main id="main-content" className="grid min-h-screen place-items-center bg-cream px-6 text-center"><div><p className="eyebrow text-heading">Email preferences</p><h1 className="hero-title mt-4 text-heading">This link is no longer valid.</h1><p className="mt-6 text-sm text-ink/70">Request a new registration email or contact GLR for help.</p><Link href="/" className="button-primary mt-8">Return to GLR</Link></div></main>; }

@@ -8,6 +8,8 @@ html { scroll-behavior: smooth; }
 body { margin: 0; overflow-x: hidden; }
 ::selection { background: #951d32; color: white; }
 img { user-select: none; }
+.skip-link { position: fixed; left: 1rem; top: 1rem; z-index: 200; transform: translateY(-200%); background: #fff; color: #1c0007; padding: .75rem 1rem; }
+.skip-link:focus { transform: translateY(0); }
 
 @layer components {
   .editorial-container { @apply mx-auto max-w-editorial px-5 sm:px-8 lg:px-12; }
@@ -16,11 +18,6 @@ img { user-select: none; }
   .section-title { @apply font-serif text-4xl leading-none text-heading sm:text-5xl lg:text-6xl; }
   .card-title { @apply font-serif text-2xl leading-tight text-heading sm:text-3xl; }
   .button-primary { @apply inline-flex min-h-11 items-center justify-center bg-wine px-7 text-[10px] font-semibold uppercase tracking-editorial text-white transition hover:bg-heading; }
-}
-
-@keyframes category-marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
 }
 
 @keyframes registration-backdrop-in {
@@ -43,26 +40,18 @@ img { user-select: none; }
 }
 
 .category-marquee-track {
-  animation: category-marquee 38s linear infinite;
   width: max-content;
 }
 
-.category-marquee-track:hover { animation-play-state: paused; }
-
 @media (max-width: 767px) {
   .category-marquee-viewport {
-    overflow-x: auto;
     overscroll-behavior-inline: contain;
-    scrollbar-width: none;
   }
-  .category-marquee-viewport::-webkit-scrollbar { display: none; }
-  .category-marquee-track { animation: none; }
   .category-marquee-track > [aria-hidden='true'] { display: none; }
   .category-marquee-track article { scroll-snap-align: start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .category-marquee-track { animation: none; }
-  .registration-backdrop,
-  .registration-panel { animation: none; }
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

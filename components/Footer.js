@@ -6,7 +6,7 @@ import OpenRegistrationButton from './OpenRegistrationButton';
 const editorialLinks = [
   ['Explore', [['Travel & Experiences', '/categories/travel'], ['Fashion & Style', '/categories/fashion'], ['Design', '/categories/design'], ['Wellness', '/categories/wellness'], ['Automotive', '/categories/automotive'], ['Culture', '/categories/culture']]],
   ['The Journal', [['Latest Reports', '/categories/all'], ['About GLR', '/about'], ['Our Mission', '/about'], ['Global Reach', '/about'], ['Contact', '/contact']]],
-  ['Information', [['Editorial Standards', '#'], ['Contributors', '#'], ['Privacy Policy', '#'], ['Terms of Use', '#'], ['Cookie Policy', '#']]]
+  ['Information', [['Editorial Standards', '/information/editorial-standards'], ['Contributors', '/information/contributors'], ['Privacy Policy', '/information/privacy'], ['Terms of Use', '/information/terms'], ['Cookie Policy', '/information/cookies']]]
 ];
 
 const socialLinks = [

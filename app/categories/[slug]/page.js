@@ -5,7 +5,7 @@ import ReportCard from '@/components/ReportCard';
 import SiteShell from '@/components/SiteShell';
 import { getCategories, getReports } from '@/lib/api';
 
-export async function generateMetadata({ params }) { const { slug } = await params; const categories = await getCategories(); const category = categories.find((item) => item.slug === slug); return { title: category?.name || 'Reports' }; }
+export async function generateMetadata({ params, searchParams }) { const { slug } = await params; const { page } = await searchParams; const categories = await getCategories(); const category = slug === 'all' ? { name: 'All Reports', description: 'The latest stories from Global Luxury Reporter.' } : categories.find((item) => item.slug === slug); const suffix = Number(page) > 1 ? `?page=${Number(page)}` : ''; return { title: category?.name || 'Reports', description: category?.description, alternates: { canonical: `/categories/${slug}${suffix}` }, openGraph: { title: category?.name || 'Reports', description: category?.description, url: `/categories/${slug}${suffix}` } }; }
 
 export default async function CategoryPage({ params, searchParams }) {
   const { slug } = await params;
@@ -18,8 +18,8 @@ export default async function CategoryPage({ params, searchParams }) {
   const totalPages = Math.max(1, Math.ceil((result.meta?.total_count || result.data.length) / 9));
   return (
     <SiteShell>
-      <main>
-        <header className="relative min-h-[420px] bg-ink"><Image src={category.cover_image} alt="" fill priority className="object-cover opacity-55" sizes="100vw" /><div className="absolute inset-0 bg-ink/25" /><div className="editorial-container relative flex min-h-[420px] items-center justify-center text-center text-white"><div><p className="eyebrow">The GLR edit</p><h1 className="mt-5 font-serif text-6xl sm:text-7xl lg:text-8xl">{category.name}</h1><p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-white/80">{category.description}</p></div></div></header>
+      <main id="main-content">
+        <header className="relative min-h-[420px] bg-ink"><Image src={category.cover_image} alt="" fill priority unoptimized className="object-cover opacity-55" sizes="100vw" /><div className="absolute inset-0 bg-ink/25" /><div className="editorial-container relative flex min-h-[420px] items-center justify-center text-center text-white"><div><p className="eyebrow">The GLR edit</p><h1 className="mt-5 font-serif text-6xl sm:text-7xl lg:text-8xl">{category.name}</h1><p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-white/80">{category.description}</p></div></div></header>
         <section className="editorial-container py-20 lg:py-28"><div className="grid gap-x-8 gap-y-16 md:grid-cols-2 lg:grid-cols-3">{result.data.map((report, index) => <ReportCard key={report.slug} report={report} priority={index < 3} className={index % 5 === 1 ? 'lg:mt-16' : ''} />)}</div>{result.data.length === 0 && <p className="py-24 text-center font-serif text-3xl text-ink/60">New reports are coming soon.</p>}<Pagination current={page} total={totalPages} basePath={`/categories/${slug}`} /></section>
       </main>
     </SiteShell>

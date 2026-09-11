@@ -1,6 +1,6 @@
 # Global Luxury Reporter
 
-A single Next.js application containing the responsive editorial frontend, server-rendered data layer, API route handlers, contact validation, and Directus integration. Directus is the only separately hosted service.
+A Next.js application containing the responsive editorial frontend and its server-side backend-for-frontend (BFF). The BFF mediates all website access to a private Directus CMS backed by MariaDB/MySQL. Directus is the admin interface and content system; browser code never receives its URL or service token.
 
 ## Architecture
 
@@ -9,8 +9,9 @@ A single Next.js application containing the responsive editorial frontend, serve
 - Server-only Directus mapping: `lib/data-service.js`
 - Local editorial fallback data: `lib/fallback-data.js`
 - Local images: `public/`
+- Directus container, schema bootstrap, service policy, and optional starter import: `directus/`
 
-The Directus token is read only by server code and is never included in the browser bundle. Server-rendered pages call the shared data service directly; browser form submissions use the same-origin `/api/contact` endpoint.
+The Directus token is read only by server code and is never included in the browser bundle. Server-rendered pages call the shared data service directly; browser form submissions and authorized CMS assets use same-origin Next.js endpoints. Content reads use `no-store`, so published Directus changes are visible on the next request without a cache-invalidation webhook.
 
 ## Local development
 
@@ -19,7 +20,8 @@ The Directus token is read only by server code and is never included in the brow
 3. Run `npm run dev`.
 4. Open `http://localhost:3000`.
 
-Keep `USE_MOCK_DATA=true` until Directus is available.
+Mock data is development-only and is ignored in production. For the complete CMS setup, follow [`directus/README.md`](directus/README.md).
+The full request flow, security model, and deployment checklist are documented in [`docs/backend-architecture.md`](docs/backend-architecture.md).
 
 ## Deploy to Vercel
 
@@ -27,9 +29,14 @@ Import this repository as one Next.js Vercel project. Add these server-side envi
 
 - `DIRECTUS_URL`
 - `DIRECTUS_TOKEN`
-- `USE_MOCK_DATA=true` initially, then `false` when Directus is connected
+- `USE_MOCK_DATA=false`
+- `SITE_URL`
+- `SUBSCRIPTION_SECRET`
+- `RATE_LIMIT_IP_HEADER` set to a header overwritten by the trusted ingress
+- SMTP and sender variables from `.env.example`
+- `ROBOTS_INDEXING=false` until the production smoke test passes
 
-No `NEXT_PUBLIC_API_URL`, Express server, CORS configuration, or second Vercel project is required.
+No `NEXT_PUBLIC_API_URL`, Express/Fastify server, CORS configuration, or second Next.js project is required. Directus must remain private; protect remote Studio access with a TLS identity-aware gateway or VPN.
 
 ## API routes
 
@@ -37,9 +44,16 @@ No `NEXT_PUBLIC_API_URL`, Express server, CORS configuration, or second Vercel p
 - `GET /api/reports/:slug`
 - `GET /api/categories`
 - `POST /api/contact`
+- `POST /api/subscribe`
+- `POST /api/subscription/confirm`
+- `POST /api/subscription/unsubscribe`
+- `GET /api/assets/:id`
+- `GET /api/health`
 
 ## Directus collections
 
-- `reports`: `title`, `slug`, `excerpt`, `content`, `category` (M2O), `cover_image`, `author`, `published_at`, `featured`, `status`
+- `reports`: `title`, `slug`, `excerpt`, `content`, `category` (M2O), `cover_image`, `cover_alt`, `author`, `published_at`, `reading_time`, `featured`, `editor_pick`, `popularity`, `status`
 - `categories`: `name`, `slug`, `description`, `cover_image`, `sort`
 - `inquiries`: `name`, `email`, `message`, `status`
+- `subscribers`: double-opt-in state, consent audit fields, and confirmation metadata
+- `request_attempts`: short-lived hashed abuse-control counters

@@ -1,38 +1,42 @@
 import { NextResponse } from 'next/server';
 import sanitizeHtml from 'sanitize-html';
 import { createSubscriber } from '@/lib/data-service';
-
-const attempts = new Map();
-const WINDOW_MS = 15 * 60 * 1000;
-const MAX_ATTEMPTS = 10;
+import { sendConfirmationEmail } from '@/lib/email';
+import { absoluteUrl } from '@/lib/site';
+import { consentIpHash, rateLimited, rateLimitedKey, requestBodyTooLarge } from '@/lib/request-security';
 
 function clean(value) {
   return sanitizeHtml(String(value || ''), { allowedTags: [], allowedAttributes: {} }).trim().toLowerCase();
 }
 
-function rateLimited(request) {
-  const now = Date.now();
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const recent = (attempts.get(ip) || []).filter((timestamp) => now - timestamp < WINDOW_MS);
-  recent.push(now);
-  attempts.set(ip, recent);
-  return recent.length > MAX_ATTEMPTS;
-}
-
 export async function POST(request) {
-  if (rateLimited(request)) return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 429 });
+  if (requestBodyTooLarge(request)) return NextResponse.json({ error: 'Request is too large.' }, { status: 413 });
 
   try {
+    if (await rateLimited(request, 'subscribe-ip', 10)) {
+      return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 429, headers: { 'Retry-After': '900' } });
+    }
     const body = await request.json();
+    if (body.website) return NextResponse.json({ message: 'If this address is eligible, a confirmation email will arrive shortly.' }, { status: 202 });
     const email = clean(body.email);
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 422 });
     }
 
-    const subscriber = await createSubscriber({ email });
-    return NextResponse.json({ data: { id: subscriber.id }, message: 'Welcome to Global Luxury Reporter.' }, { status: 201 });
+    if (await rateLimitedKey('subscribe-email', email, 4)) {
+      return NextResponse.json({ message: 'If this address is eligible, a confirmation email will arrive shortly.' }, { status: 202 });
+    }
+    const subscriber = await createSubscriber({ email, consent_ip_hash: consentIpHash(request) });
+    if (subscriber.confirmationToken) {
+      try {
+        await sendConfirmationEmail(email, absoluteUrl(`/subscription/confirm?token=${encodeURIComponent(subscriber.confirmationToken)}`));
+      } catch (error) {
+        console.error('Unable to deliver subscription confirmation email', error);
+      }
+    }
+    return NextResponse.json({ message: 'If this address is eligible, a confirmation email will arrive shortly.' }, { status: 202 });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: 'Unable to register your email right now.' }, { status: error.status || 500 });
+    return NextResponse.json({ error: 'Unable to register your email right now.' }, { status: error.status === 422 ? 422 : 503 });
   }
 }

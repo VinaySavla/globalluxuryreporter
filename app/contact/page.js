@@ -2,12 +2,12 @@ import { Instagram, Linkedin } from 'lucide-react';
 import SiteShell from '@/components/SiteShell';
 import ContactForm from '@/components/ContactForm';
 
-export const metadata = { title: 'Contact' };
+export const metadata = { title: 'Contact', description: 'Contact the Global Luxury Reporter editorial team.', alternates: { canonical: '/contact' } };
 
 export default function ContactPage() {
   return (
     <SiteShell>
-      <main className="editorial-container py-12 sm:py-16 lg:py-12 xl:py-16">
+      <main id="main-content" className="editorial-container py-12 sm:py-16 lg:py-12 xl:py-16">
         <div className="grid gap-12 lg:grid-cols-[.85fr_1.15fr] lg:gap-20 xl:gap-28">
           <section>
             <p className="eyebrow text-heading">Contact</p><h1 className="hero-title mt-5 text-heading">Get in touch.</h1><p className="mt-6 text-base text-ink/70">Where global luxury stories find their voice.</p>
