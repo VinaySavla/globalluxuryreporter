@@ -19,18 +19,8 @@ jobs:
       - run: npm audit --omit=dev
       - run: npm run build
         env:
-          DIRECTUS_URL: http://127.0.0.1:9
-          DIRECTUS_TOKEN: ci-build-token
-          USE_MOCK_DATA: "false"
+          WORDPRESS_URL: http://127.0.0.1:9/cms
+          WORDPRESS_SERVICE_TOKEN: ci-build-token
           ROBOTS_INDEXING: "false"
-      - run: docker compose -f directus/docker-compose.yml config --quiet
-        env:
-          DIRECTUS_SECRET: ci-secret
-          DIRECTUS_ADMIN_EMAIL: admin@example.com
-          DIRECTUS_ADMIN_PASSWORD: ci-password
-          DIRECTUS_ADMIN_TOKEN: ci-admin-token
-          DIRECTUS_SERVICE_TOKEN: ci-service-token
-          DB_HOST: database
-          DB_DATABASE: glr
-          DB_USER: glr
-          DB_PASSWORD: ci-database-password
+      - run: php -l wordpress/glr-cms/glr-cms.php
+      - run: php wordpress/tests/contracts.php

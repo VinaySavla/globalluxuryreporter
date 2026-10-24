@@ -2,9 +2,8 @@ node_modules
 .next
 .env
 .env.local
+.env*.local
 .vercel
 npm-debug.log*
 .DS_Store
 coverage
-directus/uploads/*
-!directus/uploads/.gitkeep

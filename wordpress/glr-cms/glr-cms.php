@@ -1,0 +1,326 @@
+<?php
+/**
+ * Plugin Name: GLR Editorial CMS
+ * Description: Private editorial backend for the existing Global Luxury Reporter frontend.
+ * Version: 1.0.2
+ */
+if (!defined('ABSPATH')) exit;
+
+function glr_table($name) { global $wpdb; return $wpdb->prefix . 'glr_' . $name; }
+function glr_error($message, $status = 400) { return new WP_Error('glr_error', $message, ['status' => $status]); }
+function glr_service_allowed() {
+    $config = __DIR__ . '/service-key.php';
+    $hash = is_file($config) ? require $config : '';
+    $header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    return is_string($hash) && strlen($hash) === 64 && preg_match('/^Bearer (\S+)$/', $header, $match) && hash_equals($hash, hash('sha256', $match[1]));
+}
+function glr_permission() { return glr_service_allowed() ? true : glr_error('Authentication required', 401); }
+function glr_private_directory() {
+    // Outside public_html: neither originals nor resized images have public upload URLs.
+    $document_root = dirname(rtrim(ABSPATH, '/\\'));
+    if (basename($document_root) !== 'public_html') throw new RuntimeException('Install GLR WordPress in public_html/cms');
+    $directory = dirname($document_root) . '/glr-private-media';
+    if (!is_dir($directory) && !wp_mkdir_p($directory)) throw new RuntimeException('Cannot create private media storage');
+    return $directory;
+}
+function glr_install() {
+    global $wpdb;
+    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+    $charset = $wpdb->get_charset_collate();
+    $records = glr_table('records');
+    $attempts = glr_table('attempts');
+    dbDelta("CREATE TABLE $records (
+        kind varchar(20) NOT NULL,
+        id varchar(128) NOT NULL,
+        email varchar(254) DEFAULT NULL,
+        data longtext NOT NULL,
+        PRIMARY KEY  (kind,id),
+        UNIQUE KEY subscriber_email (email)
+    ) $charset;");
+    dbDelta("CREATE TABLE $attempts (
+        id bigint unsigned NOT NULL AUTO_INCREMENT,
+        scope varchar(50) NOT NULL,
+        key_hash char(64) NOT NULL,
+        expires_at bigint NOT NULL,
+        PRIMARY KEY  (id),
+        KEY lookup_attempts (scope,key_hash,expires_at),
+        KEY expiry (expires_at)
+    ) $charset;");
+    update_option('default_comment_status', 'closed');
+    update_option('default_ping_status', 'closed');
+    update_option('blog_public', '0');
+    update_option('blogname', 'Global Luxury Reporter — Editorial');
+    if (!get_role('glr_editor')) add_role('glr_editor', 'GLR Editor', ['read' => true, 'edit_posts' => true, 'edit_others_posts' => true, 'publish_posts' => true, 'delete_posts' => true, 'delete_others_posts' => true, 'edit_published_posts' => true, 'delete_published_posts' => true, 'manage_categories' => true, 'manage_glr_records' => true]);
+    get_role('administrator')->add_cap('manage_glr_records');
+    glr_private_directory();
+}
+register_activation_hook(__FILE__, 'glr_install');
+
+add_action('init', function () {
+    register_post_status('glr_archived', ['label' => 'Archived', 'public' => false, 'internal' => false, 'show_in_admin_all_list' => true, 'show_in_admin_status_list' => true, 'label_count' => _n_noop('Archived <span class="count">(%s)</span>', 'Archived <span class="count">(%s)</span>')]);
+    register_post_type('glr_report', ['labels' => ['name' => 'Reports', 'singular_name' => 'Report', 'add_new_item' => 'Add report'], 'public' => false, 'show_ui' => true, 'show_in_rest' => false, 'menu_icon' => 'dashicons-media-document', 'supports' => ['title', 'editor', 'excerpt', 'revisions'], 'rewrite' => false]);
+    register_taxonomy('glr_category', 'glr_report', ['label' => 'GLR Categories', 'public' => false, 'show_ui' => true, 'show_admin_column' => true, 'meta_box_cb' => false, 'rewrite' => false]);
+});
+// Enforce the no-comments rule for administrators, anonymous visitors and API callers.
+add_filter('comments_open', '__return_false', PHP_INT_MAX);
+add_filter('pings_open', '__return_false', PHP_INT_MAX);
+add_filter('comments_array', '__return_empty_array', PHP_INT_MAX);
+add_filter('preprocess_comment', function () { wp_die('Comments are disabled.', '', ['response' => 403]); });
+add_filter('xmlrpc_enabled', '__return_false');
+add_filter('xmlrpc_methods', function ($methods) {
+    foreach (array_keys($methods) as $method) if (stripos($method, 'comment') !== false || stripos($method, 'pingback') !== false) unset($methods[$method]);
+    return $methods;
+});
+add_filter('wp_insert_post_data', function ($data) { $data['comment_status'] = 'closed'; $data['ping_status'] = 'closed'; return $data; });
+add_filter('rest_pre_insert_comment', function () { return glr_error('Comments are disabled', 403); });
+add_filter('rest_authentication_errors', function ($error) {
+    if (is_wp_error($error) || is_user_logged_in() || glr_service_allowed()) return $error;
+    return glr_error('Private editorial API', 401);
+}, 110);
+add_action('admin_menu', function () { remove_menu_page('edit-comments.php'); remove_menu_page('edit.php'); remove_menu_page('edit.php?post_type=page'); });
+add_action('template_redirect', function () { status_header(404); nocache_headers(); exit('GLR editorial backend.'); });
+
+function glr_record($kind, $id) {
+    global $wpdb;
+    $json = $wpdb->get_var($wpdb->prepare('SELECT data FROM ' . glr_table('records') . ' WHERE kind=%s AND id=%s', $kind, (string)$id));
+    return $json === null ? null : json_decode($json, true);
+}
+function glr_put_record($kind, $record, $insert_only = false) {
+    global $wpdb;
+    $table = glr_table('records');
+    $row = ['kind' => $kind, 'id' => (string)$record['id'], 'email' => $kind === 'subscriber' ? $record['email'] : null, 'data' => wp_json_encode($record)];
+    $result = $insert_only ? $wpdb->insert($table, $row) : $wpdb->replace($table, $row);
+    if ($result === false) throw new RuntimeException('Unable to store record');
+    return $record;
+}
+function glr_records($kind) {
+    global $wpdb;
+    return array_map(function ($json) { return json_decode($json, true); }, $wpdb->get_col($wpdb->prepare('SELECT data FROM ' . glr_table('records') . ' WHERE kind=%s ORDER BY id', $kind)));
+}
+function glr_category($term) {
+    return ['id' => get_term_meta($term->term_id, 'glr_source_id', true) ?: $term->term_id, 'name' => html_entity_decode($term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'slug' => $term->slug, 'description' => $term->description, 'cover_image' => get_term_meta($term->term_id, 'glr_cover_image', true), 'sort' => (int)get_term_meta($term->term_id, 'glr_sort', true)];
+}
+function glr_categories() {
+    $terms = get_terms(['taxonomy' => 'glr_category', 'hide_empty' => false]);
+    if (is_wp_error($terms)) throw new RuntimeException('Cannot read categories');
+    $items = array_map('glr_category', $terms);
+    usort($items, function ($a, $b) { return ($a['sort'] <=> $b['sort']) ?: strcmp($a['name'], $b['name']); });
+    return $items;
+}
+function glr_report($post, $include_content = false) {
+    $terms = wp_get_object_terms($post->ID, 'glr_category');
+    $item = ['id' => get_post_meta($post->ID, 'glr_source_id', true) ?: $post->ID, 'title' => $post->post_title, 'slug' => $post->post_name, 'excerpt' => $post->post_excerpt, 'category' => $terms && !is_wp_error($terms) ? glr_category($terms[0]) : null, 'published_at' => str_replace(' ', 'T', $post->post_date_gmt) . 'Z', 'date_updated' => str_replace(' ', 'T', $post->post_modified_gmt) . 'Z'];
+    foreach (['cover_image', 'cover_alt', 'author', 'reading_time', 'featured', 'editor_pick', 'popularity'] as $key) $item[$key] = get_post_meta($post->ID, 'glr_' . $key, true);
+    foreach (['featured', 'editor_pick'] as $key) $item[$key] = (bool)$item[$key];
+    foreach (['reading_time', 'popularity'] as $key) $item[$key] = (int)$item[$key];
+    if ($include_content) $item['content'] = $post->post_content;
+    return $item;
+}
+function glr_query($request, $include_content = false) {
+    $limit = (string)$request->get_param('limit') === '-1' ? -1 : min(24, max(1, (int)($request->get_param('limit') ?: 9)));
+    // Include due scheduled posts even when shared hosting's WP-Cron has not run yet.
+    $args = ['post_type' => 'glr_report', 'post_status' => ['publish', 'future'], 'posts_per_page' => $limit, 'paged' => max(1, (int)$request->get_param('page')), 'orderby' => 'date', 'order' => 'DESC', 'date_query' => [['column' => 'post_date_gmt', 'before' => gmdate('Y-m-d H:i:s'), 'inclusive' => true]]];
+    if ($request->get_param('slug')) $args['name'] = (string)$request->get_param('slug');
+    if ($request->get_param('category')) $args['tax_query'] = [['taxonomy' => 'glr_category', 'field' => 'slug', 'terms' => (string)$request->get_param('category')]];
+    if ($request->get_param('featured') !== null) $args['meta_query'] = [['key' => 'glr_featured', 'value' => $request->get_param('featured') === 'true' ? '1' : '0']];
+    if ($request->get_param('search')) $args['s'] = (string)$request->get_param('search');
+    $query = new WP_Query($args);
+    return ['data' => array_map(function ($post) use ($include_content) { return glr_report($post, $include_content); }, $query->posts), 'meta' => ['total_count' => (int)$query->found_posts, 'page' => $args['paged'], 'limit' => $limit === -1 ? count($query->posts) : $limit]];
+}
+function glr_asset_is_public($id) {
+    foreach (glr_categories() as $category) if ($category['cover_image'] === $id) return true;
+    $request = new WP_REST_Request(); $request->set_param('limit', '-1');
+    foreach (glr_query($request, true)['data'] as $report) if ($report['cover_image'] === $id || strpos($report['content'], $id) !== false) return true;
+    return false;
+}
+function glr_store_asset($file, $bytes) {
+    $id = (string)($file['id'] ?? wp_generate_uuid4());
+    if (!preg_match('/^[a-zA-Z0-9-]{1,128}$/', $id) || strlen($bytes) > 20 * 1024 * 1024) throw new InvalidArgumentException('Invalid image');
+    $info = @getimagesizefromstring($bytes);
+    if (!$info || !in_array($info['mime'], ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'], true)) throw new InvalidArgumentException('Unsupported image');
+    $sha = hash('sha256', $bytes);
+    if (isset($file['sha256']) && !hash_equals($file['sha256'], $sha)) throw new InvalidArgumentException('Image checksum mismatch');
+    $existing = glr_record('asset', $id);
+    if ($existing) { if ($existing['sha256'] !== $sha) throw new RuntimeException('Asset ID collision'); return $existing; }
+    $path = glr_private_directory() . '/' . $id;
+    if (file_put_contents($path, $bytes, LOCK_EX) !== strlen($bytes)) throw new RuntimeException('Image write failed');
+    chmod($path, 0600);
+    return glr_put_record('asset', ['id' => $id, 'filename' => sanitize_file_name($file['filename'] ?? $id), 'type' => $info['mime'], 'bytes' => strlen($bytes), 'sha256' => $sha]);
+}
+
+add_action('rest_api_init', function () {
+    $route = function ($path, $methods, $callback) { register_rest_route('glr/v1', $path, ['methods' => $methods, 'permission_callback' => 'glr_permission', 'callback' => function ($request) use ($callback) { try { $result = $callback($request); if (is_wp_error($result)) return $result; $response = rest_ensure_response($result); $response->header('Cache-Control', 'private, no-store, max-age=0'); return $response; } catch (InvalidArgumentException $error) { return glr_error($error->getMessage(), 422); } catch (Throwable $error) { error_log('GLR CMS: ' . $error->getMessage()); return glr_error('CMS operation failed', 503); } }]); };
+    $route('/health', 'GET', function () { global $wpdb; $wpdb->get_var('SELECT COUNT(*) FROM ' . glr_table('records')); return $wpdb->last_error ? glr_error('Database unavailable', 503) : ['status' => 'ok']; });
+    $route('/reports', 'GET', function ($r) { return glr_query($r, (bool)$r->get_param('slug')); });
+    $route('/categories', 'GET', function () { return ['data' => glr_categories()]; });
+    $route('/sitemap', 'GET', function () { $r = new WP_REST_Request(); $r->set_param('limit', '-1'); return ['categories' => glr_categories(), 'reports' => glr_query($r)['data']]; });
+    $route('/inquiries', 'POST', function ($r) {
+        $p = $r->get_json_params();
+        $name = sanitize_text_field($p['name'] ?? ''); $email = strtolower(sanitize_email($p['email'] ?? '')); $message = sanitize_textarea_field($p['message'] ?? '');
+        if (strlen($name) < 2 || strlen($name) > 100 || !is_email($email) || strlen($message) < 10 || strlen($message) > 3000) return glr_error('Invalid enquiry', 422);
+        return ['data' => glr_put_record('inquiry', ['id' => wp_generate_uuid4(), 'name' => $name, 'email' => $email, 'message' => $message, 'status' => 'new', 'date_created' => gmdate('c')], true)];
+    });
+    $route('/subscribers', 'GET', function ($r) { global $wpdb; $email = strtolower((string)$r->get_param('email')); $json = $wpdb->get_var($wpdb->prepare('SELECT data FROM ' . glr_table('records') . ' WHERE kind=%s AND email=%s', 'subscriber', $email)); return ['data' => $json ? [json_decode($json, true)] : []]; });
+    $route('/subscribers', 'POST', function ($r) {
+        global $wpdb; $p = $r->get_json_params(); $email = strtolower(sanitize_email($p['email'] ?? ''));
+        if (!is_email($email)) return glr_error('Invalid email', 422);
+        $existing = $wpdb->get_var($wpdb->prepare('SELECT data FROM ' . glr_table('records') . ' WHERE email=%s', $email));
+        if ($existing) return ['data' => json_decode($existing, true)];
+        return ['data' => glr_put_record('subscriber', ['id' => wp_generate_uuid4(), 'email' => $email, 'status' => 'pending', 'source' => 'website_dialog', 'consent_version' => '2026-09-11', 'date_created' => gmdate('c')], true)];
+    });
+    $route('/subscribers/(?P<id>[a-zA-Z0-9-]{1,128})', 'GET', function ($r) { $item = glr_record('subscriber', $r['id']); return $item ? ['data' => $item] : glr_error('Subscriber not found', 404); });
+    $route('/subscribers/(?P<id>[a-zA-Z0-9-]{1,128})', 'PATCH', function ($r) {
+        global $wpdb;
+        // Lock the row so activation cannot overwrite an unsubscribe arriving concurrently.
+        $wpdb->query('START TRANSACTION');
+        try {
+            $json = $wpdb->get_var($wpdb->prepare('SELECT data FROM ' . glr_table('records') . ' WHERE kind=%s AND id=%s FOR UPDATE', 'subscriber', $r['id']));
+            if (!$json) { $wpdb->query('ROLLBACK'); return glr_error('Subscriber not found', 404); }
+            $item = json_decode($json, true); $p = $r->get_json_params();
+            if (($p['status'] ?? '') === 'active' && ($item['status'] !== 'pending' || ($p['expected_nonce_hash'] ?? '') !== ($item['confirmation_nonce_hash'] ?? null) || strtotime($item['confirmation_expires_at'] ?? '') <= time())) { $wpdb->query('ROLLBACK'); return glr_error('Confirmation no longer valid', 409); }
+            $allowed = ['status', 'confirmation_nonce_hash', 'confirmation_expires_at', 'consent_ip_hash', 'consent_version', 'confirmed_at', 'unsubscribed_at'];
+            foreach ($allowed as $key) if (array_key_exists($key, $p)) $item[$key] = $p[$key];
+            if (!in_array($item['status'], ['pending', 'active', 'unsubscribed'], true)) { $wpdb->query('ROLLBACK'); return glr_error('Invalid subscriber status', 422); }
+            $item['date_updated'] = gmdate('c');
+            if ($wpdb->update(glr_table('records'), ['data' => wp_json_encode($item)], ['kind' => 'subscriber', 'id' => $r['id']]) === false) throw new RuntimeException('Subscriber write failed');
+            $wpdb->query('COMMIT'); return ['data' => $item];
+        } catch (Throwable $error) { $wpdb->query('ROLLBACK'); throw $error; }
+    });
+    $route('/rate-limit', 'POST', function ($r) {
+        global $wpdb; $p = $r->get_json_params(); $table = glr_table('attempts');
+        if (!preg_match('/^[a-f0-9]{64}$/', $p['key_hash'] ?? '') || !preg_match('/^[a-zA-Z0-9-]{1,50}$/', $p['scope'] ?? '')) return glr_error('Invalid rate limit', 422);
+        $wpdb->query($wpdb->prepare("DELETE FROM $table WHERE expires_at < %d LIMIT 1000", time()));
+        if ($wpdb->insert($table, ['scope' => $p['scope'], 'key_hash' => $p['key_hash'], 'expires_at' => time() + min(86400, max(1, (int)$p['window_seconds']))]) === false) throw new RuntimeException('Rate limit write failed');
+        $count = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE scope=%s AND key_hash=%s AND expires_at>%d", $p['scope'], $p['key_hash'], time()));
+        return ['limited' => $count > max(1, (int)$p['max'])];
+    });
+    $route('/assets/(?P<id>[a-zA-Z0-9-]{1,128})', 'GET', function ($r) {
+        $file = glr_record('asset', $r['id']);
+        if (!$file || !glr_asset_is_public($r['id'])) return glr_error('Asset not found', 404);
+        return ['glr_stream' => $r['id'], 'type' => $file['type']];
+    });
+
+});
+
+add_filter('rest_pre_serve_request', function ($served, $result, $request) {
+    $data = $result->get_data();
+    if (strpos($request->get_route(), '/glr/v1/assets/') !== 0 || !is_array($data) || empty($data['glr_stream'])) return $served;
+    $path = glr_private_directory() . '/' . $data['glr_stream'];
+    if (!is_file($path)) { status_header(404); return true; }
+    $mime = $data['type'];
+    $width = min(2400, max(0, (int)$request->get_param('width')));
+    $height = min(2400, max(0, (int)$request->get_param('height')));
+    $quality = min(90, max(20, (int)($request->get_param('quality') ?: 80)));
+    $format = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'avif' => 'image/avif'][$request->get_param('format') ?? ''] ?? $mime;
+    $temporary = null;
+    if ($width || $height || $request->get_param('format') || $request->get_param('quality')) {
+        $editor = wp_get_image_editor($path);
+        if (!is_wp_error($editor)) {
+            $editor->set_quality($quality);
+            $resized = ($width || $height) ? $editor->resize($width ?: null, $height ?: null, $request->get_param('fit') === 'cover') : true;
+            if (!is_wp_error($resized)) {
+                $output = $editor->save(glr_private_directory() . '/' . wp_generate_uuid4(), $format);
+                if (!is_wp_error($output)) { $path = $output['path']; $mime = $output['mime-type']; $temporary = $path; }
+            }
+        }
+    }
+    header('Content-Type: ' . $mime); header('Cache-Control: private, no-store, max-age=0'); header('X-Content-Type-Options: nosniff');
+    header('Content-Length: ' . filesize($path)); readfile($path); if ($temporary) unlink($temporary); return true;
+}, 10, 3);
+
+function glr_uploaded_image($key) {
+    if (empty($_FILES[$key]['tmp_name'])) return null;
+    if ($_FILES[$key]['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($_FILES[$key]['tmp_name'])) throw new RuntimeException('Image upload failed');
+    return glr_store_asset(['filename' => $_FILES[$key]['name']], file_get_contents($_FILES[$key]['tmp_name']))['id'];
+}
+add_action('add_meta_boxes', function () {
+    add_meta_box('glr-editorial', 'Editorial details', function ($post) {
+        wp_nonce_field('glr_save_report', 'glr_nonce');
+        $categories = get_terms(['taxonomy' => 'glr_category', 'hide_empty' => false]);
+        $assigned = wp_get_object_terms($post->ID, 'glr_category', ['fields' => 'ids']);
+        echo '<p><label>Category <select name="glr_category"><option value="">Choose category</option>';
+        foreach ($categories as $term) echo '<option value="' . (int)$term->term_id . '" ' . selected($assigned[0] ?? 0, $term->term_id, false) . '>' . esc_html($term->name) . '</option>';
+        echo '</select></label></p>';
+        foreach (['author' => 'Author / byline', 'cover_alt' => 'Cover image description', 'reading_time' => 'Reading time (minutes)', 'popularity' => 'Most Read ranking score'] as $key => $label) {
+            $type = in_array($key, ['reading_time', 'popularity'], true) ? 'number' : 'text';
+            echo '<p><label>' . esc_html($label) . '<br><input class="widefat" type="' . $type . '" name="glr_' . $key . '" value="' . esc_attr(get_post_meta($post->ID, 'glr_' . $key, true)) . '"></label></p>';
+        }
+        foreach (['featured' => 'Featured on homepage', 'editor_pick' => "Editor's Pick"] as $key => $label) echo '<p><label><input type="checkbox" name="glr_' . $key . '" value="1" ' . checked(get_post_meta($post->ID, 'glr_' . $key, true), 1, false) . '> ' . esc_html($label) . '</label></p>';
+        echo '<p>Cover image: <code>' . esc_html(get_post_meta($post->ID, 'glr_cover_image', true)) . '</code><br><input type="file" name="glr_cover_upload" accept="image/jpeg,image/png,image/webp,image/gif,image/avif"></p><p>Upload inline images under GLR Media, then insert their website URL into the article editor. Article styling comes from the existing website.</p>';
+    }, 'glr_report', 'normal', 'high');
+});
+add_action('save_post_glr_report', function ($id) {
+    if (empty($_POST['glr_nonce']) || !wp_verify_nonce($_POST['glr_nonce'], 'glr_save_report') || !current_user_can('edit_post', $id) || wp_is_post_revision($id)) return;
+    foreach (['author', 'cover_alt'] as $key) update_post_meta($id, 'glr_' . $key, sanitize_text_field(wp_unslash($_POST['glr_' . $key] ?? '')));
+    foreach (['reading_time', 'popularity'] as $key) update_post_meta($id, 'glr_' . $key, max($key === 'reading_time' ? 1 : 0, (int)($_POST['glr_' . $key] ?? 0)));
+    foreach (['featured', 'editor_pick'] as $key) update_post_meta($id, 'glr_' . $key, isset($_POST['glr_' . $key]) ? 1 : 0);
+    $category_id = (int)($_POST['glr_category'] ?? 0);
+    wp_set_object_terms($id, $category_id ? [$category_id] : [], 'glr_category');
+    try { $image = glr_uploaded_image('glr_cover_upload'); if ($image) update_post_meta($id, 'glr_cover_image', $image); }
+    catch (Throwable $error) { set_transient('glr_notice_' . get_current_user_id(), $error->getMessage(), 60); }
+    $post = get_post($id);
+    if (in_array($post->post_status, ['publish', 'future'], true) && (!$category_id || !get_post_meta($id, 'glr_cover_image', true) || !get_post_meta($id, 'glr_author', true) || !get_post_meta($id, 'glr_cover_alt', true) || !$post->post_excerpt || !$post->post_content)) {
+        global $wpdb; $wpdb->update($wpdb->posts, ['post_status' => 'draft'], ['ID' => $id]); clean_post_cache($id);
+        set_transient('glr_notice_' . get_current_user_id(), 'Saved as draft. Category, cover image, image description, author, excerpt and article body are required for publication.', 60);
+    }
+});
+add_action('admin_notices', function () { $key = 'glr_notice_' . get_current_user_id(); $notice = get_transient($key); if ($notice) { delete_transient($key); echo '<div class="notice notice-warning"><p>' . esc_html($notice) . '</p></div>'; } });
+add_filter('wp_editor_settings', function ($settings, $id) { if (get_post_type() === 'glr_report') $settings['media_buttons'] = false; return $settings; }, 10, 2);
+add_action('admin_footer-post.php', function () { if (get_post_type() === 'glr_report') echo '<script>document.querySelector("#post_status")?.add(new Option("Archived","glr_archived",false,' . (get_post_status() === 'glr_archived' ? 'true' : 'false') . '));</script>'; });
+
+function glr_category_fields($term = null) {
+    $id = is_object($term) ? $term->term_id : 0;
+    wp_nonce_field('glr_save_category', 'glr_category_nonce');
+    echo '<div class="form-field"><label>Cover image ID</label><input name="glr_cover_image" value="' . esc_attr($id ? get_term_meta($id, 'glr_cover_image', true) : '') . '"><p>Upload under GLR Media and paste the image ID.</p></div><div class="form-field"><label>Display order</label><input name="glr_sort" type="number" value="' . esc_attr($id ? get_term_meta($id, 'glr_sort', true) : 0) . '"></div>';
+}
+add_action('glr_category_add_form_fields', 'glr_category_fields');
+add_action('glr_category_edit_form_fields', 'glr_category_fields');
+function glr_save_category($id) {
+    if (!current_user_can('manage_categories') || empty($_POST['glr_category_nonce']) || !wp_verify_nonce($_POST['glr_category_nonce'], 'glr_save_category')) return;
+    $image = sanitize_text_field(wp_unslash($_POST['glr_cover_image'] ?? ''));
+    if (!$image || glr_record('asset', $image)) update_term_meta($id, 'glr_cover_image', $image);
+    update_term_meta($id, 'glr_sort', (int)($_POST['glr_sort'] ?? 0));
+}
+add_action('created_glr_category', 'glr_save_category'); add_action('edited_glr_category', 'glr_save_category');
+
+add_action('admin_menu', function () {
+    add_menu_page('GLR Media', 'GLR Media', 'edit_posts', 'glr-media', 'glr_media_admin', 'dashicons-format-image');
+    add_menu_page('GLR Enquiries', 'GLR Enquiries', 'manage_glr_records', 'glr-inquiries', function () { glr_records_admin('inquiry'); }, 'dashicons-email');
+    add_menu_page('GLR Subscribers', 'GLR Subscribers', 'manage_glr_records', 'glr-subscribers', function () { glr_records_admin('subscriber'); }, 'dashicons-groups');
+});
+function glr_media_admin() {
+    if (!current_user_can('edit_posts')) return;
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        check_admin_referer('glr_media');
+        try { glr_uploaded_image('glr_asset_upload'); } catch (Throwable $error) { echo '<div class="notice notice-error"><p>' . esc_html($error->getMessage()) . '</p></div>'; }
+    }
+    echo '<div class="wrap"><h1>GLR Media</h1><p>Original images are stored outside the public website directory. Only images referenced by published content are served to visitors.</p><form method="post" enctype="multipart/form-data">'; wp_nonce_field('glr_media'); echo '<input type="file" name="glr_asset_upload" accept="image/*" required> '; submit_button('Upload image', 'primary', 'submit', false); echo '</form><table class="widefat striped"><thead><tr><th>Preview</th><th>Filename</th><th>Image ID</th><th>Website URL</th></tr></thead><tbody>';
+    foreach (glr_records('asset') as $file) echo '<tr><td><img style="max-width:120px;max-height:90px" alt="" loading="lazy" src="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=glr_media_preview&id=' . rawurlencode($file['id'])), 'glr_preview')) . '"></td><td>' . esc_html($file['filename']) . '</td><td><code>' . esc_html($file['id']) . '</code></td><td><code>/api/assets/' . esc_html($file['id']) . '</code></td></tr>';
+    echo '</tbody></table></div>';
+}
+add_action('admin_post_glr_media_preview', function () {
+    if (!current_user_can('edit_posts')) wp_die('Forbidden', '', ['response' => 403]);
+    check_admin_referer('glr_preview');
+    $id = (string)($_GET['id'] ?? '');
+    if (!preg_match('/^[a-zA-Z0-9-]{1,128}$/', $id) || !($file = glr_record('asset', $id))) wp_die('Not found', '', ['response' => 404]);
+    $path = glr_private_directory() . '/' . $id;
+    if (!is_file($path)) wp_die('Not found', '', ['response' => 404]);
+    nocache_headers(); header('Content-Type: ' . $file['type']); header('X-Content-Type-Options: nosniff'); readfile($path); exit;
+});
+function glr_records_admin($kind) {
+    if (!current_user_can('manage_glr_records')) return;
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        check_admin_referer('glr_records_' . $kind);
+        $item = glr_record($kind, sanitize_text_field(wp_unslash($_POST['record_id'] ?? '')));
+        $status = sanitize_text_field(wp_unslash($_POST['record_status'] ?? ''));
+        $allowed = $kind === 'inquiry' ? ['new', 'in_progress', 'closed'] : ['pending', 'active', 'unsubscribed'];
+        if ($item && in_array($status, $allowed, true)) { $item['status'] = $status; if ($status === 'unsubscribed') $item['unsubscribed_at'] = gmdate('c'); glr_put_record($kind, $item); }
+    }
+    echo '<div class="wrap"><h1>' . ($kind === 'inquiry' ? 'GLR Enquiries' : 'GLR Subscribers') . '</h1><table class="widefat striped"><thead><tr><th>Email / name</th><th>Details</th><th>Status</th></tr></thead><tbody>';
+    foreach (glr_records($kind) as $item) {
+        echo '<tr><td>' . esc_html($item['email']) . '<br>' . esc_html($item['name'] ?? '') . '</td><td><pre style="white-space:pre-wrap">' . esc_html($kind === 'inquiry' ? $item['message'] : wp_json_encode(array_diff_key($item, array_flip(['confirmation_nonce_hash', 'consent_ip_hash'])), JSON_PRETTY_PRINT)) . '</pre></td><td><form method="post">'; wp_nonce_field('glr_records_' . $kind); echo '<input type="hidden" name="record_id" value="' . esc_attr($item['id']) . '"><select name="record_status">';
+        foreach ($kind === 'inquiry' ? ['new', 'in_progress', 'closed'] : ['pending', 'active', 'unsubscribed'] as $status) echo '<option ' . selected($item['status'], $status, false) . '>' . esc_html($status) . '</option>';
+        echo '</select>'; submit_button('Save', 'secondary', 'submit', false); echo '</form></td></tr>';
+    }
+    echo '</tbody></table></div>';
+}

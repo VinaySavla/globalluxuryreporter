@@ -1,47 +1,25 @@
 # GLR backend architecture
 
-## Request path
+The public website is the existing Next.js application. Its pages and same-origin API routes use lib/data-service.js, which calls the private GLR WordPress API through lib/wordpress-client.mjs. Frontend components, layouts and CSS are unchanged.
 
-```text
-Public browser
-  -> Next.js pages and same-origin /api routes
-      -> server-only Directus client (static service token)
-          -> private Directus REST API
-              -> private MariaDB/MySQL
+## Request flows
 
-Editor
-  -> TLS identity-aware admin gateway or VPN
-      -> Directus Studio
-```
+- Content: Next.js -> authenticated WordPress reports/categories endpoints -> WordPress posts, metadata and taxonomy. Queries expose only published or due scheduled content. Drafts, archived reports and future publication dates are excluded. Due scheduled posts do not depend on visitor-driven WP-Cron.
+- Media: browser /api/assets/:id -> authenticated WordPress -> current publication-reference check -> private storage outside public_html. Both layers emit private, no-store. Originals have no public upload URLs. Editors can preview unpublished images through nonce-protected WordPress admin requests.
+- Contact: existing validation, honeypot and shared rate limit -> private enquiry record with New / In Progress / Closed workflow.
+- Subscribe: existing IP/email limits -> pending subscriber -> confirmation nonce hash and expiry -> existing Next.js SMTP confirmation email. After signed confirmation, Next sends the welcome/unsubscribe email before activating the subscriber. WordPress locks the row and rechecks nonce and expiry before activation. Unsubscribe links retain stable subscriber IDs and use the configured subscription signing secret.
+- Administration: WordPress Reports, GLR Categories, GLR Media, GLR Enquiries and GLR Subscribers. The GLR Editor role manages content and records without configuration access. Assign staff access through WordPress user roles.
 
-Only Next.js and Directus are deployed. Next.js is the single mediator and is the only application that receives the website service token. Directus is reachable from Next.js over a private or tightly restricted network path; its container port is not published directly. Studio access uses a separate admin-only hostname protected before the Directus login screen.
+## Security and caching
 
-## Security boundaries
+WORDPRESS_SERVICE_TOKEN is server-only. A separate, uncommitted service-key.php deployment file contains its SHA-256 verifier. Anonymous REST access is blocked and the public WordPress theme is disabled. Comments and pingbacks are closed on all posts, including REST/XML-RPC submission paths.
 
-- `DIRECTUS_TOKEN` is server-only and must never use a `NEXT_PUBLIC_` prefix.
-- The bootstrap creates a non-admin service user and policy limited to the required collections and CRUD actions. Directus Core does not enable custom item/field permission rules, so Next applies the narrower published-item and accepted-field contract before returning data or writing forms.
-- Directus public-role access remains disabled. Even images are authorized and streamed through `/api/assets/:id`.
-- Subscription activation and opt-out changes require signed, purpose-bound links. Activation happens only after the opt-out email is delivered; anonymous registration never directly reverses an opt-out.
-- Contact and subscription limits are shared through short-lived, hashed Directus records. The production ingress must overwrite the configured client-IP header; form routes fail closed when that header name is not configured.
-- Draft, archived, and future-scheduled reports are blocked by mandatory Next queries. The Directus token remains private to the server, and no Directus public-role permissions are enabled.
-- Admin credentials and the bootstrap admin token belong only in `directus/.env` or a deployment secret manager.
-- Use TLS for both public services and for the database connection whenever the database is outside the private deployment network.
+Content reads use no-store, so edits affect the next request without a webhook. The existing RSS endpoint retains its five-minute public cache policy. Rate limits use short-lived hashed records in the new WordPress database. Production RATE_LIMIT_IP_HEADER must name a header overwritten by the trusted ingress.
 
-## Synchronization behavior
+## Deployment and recovery
 
-Next content reads use `cache: no-store`. Publishing, unpublishing, rescheduling, or editing a report in Directus therefore affects the next website request without a webhook or stale cache window. CMS images bypass Next Image optimization and the asset proxy emits `private, no-store`, so every request repeats the publication check. Local brand images still use normal Next.js optimization.
+WordPress lives at public_html/cms; original images live at the same site's glr-private-media directory outside public_html. Back up the database, private media and deployed service-key configuration together. Verify private media is covered by hosting backups or arrange an additional backup before launch.
 
-The schema bootstrap is safe to rerun. It creates missing GLR objects, refreshes Studio metadata and service permissions, and refuses incompatible field types. It intentionally does not delete unknown fields or content.
+WordPress is the only supported CMS. Local .env.local points at WordPress; the public frontend deployment is managed separately through Vercel.
 
-## Deployment checklist
-
-1. Use a dedicated MariaDB database and user. Grant the schema-alter privileges Directus needs for bootstrap and migrations.
-2. Back up MariaDB and `directus/uploads` together.
-3. Fill `directus/.env`, start Directus, and run the configure job.
-4. Optionally run the seed job to migrate the current local fixtures and images.
-5. Configure every variable in the root `.env.example`; leave `ROBOTS_INDEXING=false` through staging and smoke testing.
-6. Configure SPF, DKIM and DMARC for the `EMAIL_FROM` domain and verify confirmation, welcome and unsubscribe delivery.
-7. Verify `/api/health`, the home page, category pagination, report rendering, sitemap, robots, search, contact, subscription, and image authorization.
-8. Run `npm test` and `npm run build`, test a database/upload restore, and confirm monitoring alerts.
-9. Set `ROBOTS_INDEXING=true` only on the canonical production deployment.
-10. Remove initial admin credentials from the long-running container environment after first bootstrap if the deployment platform permits it. Keep the bootstrap token only where schema management requires it.
+The production CMS is `https://marketing.readglr.com/cms`. The canonical frontend URL, Gmail SMTP credentials, legal identity and a new subscription signing secret are configured in ignored environment files. Import the production values into Vercel before deploying; see [the production handoff](production-deployment.md). Verify production ingress, the complete subscription email flow and a database/private-media restore. Changing the signing secret invalidates existing subscription links. Keep indexing off until launch checks pass. See wordpress/README.md for deployment identifiers, editor instructions and verification limits.
