@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GLR Editorial CMS
  * Description: Private editorial backend for the existing Global Luxury Reporter frontend.
- * Version: 1.0.2
+ * Version: 1.2.0
  */
 if (!defined('ABSPATH')) exit;
 
@@ -133,11 +133,20 @@ function glr_asset_is_public($id) {
     foreach (glr_query($request, true)['data'] as $report) if ($report['cover_image'] === $id || strpos($report['content'], $id) !== false) return true;
     return false;
 }
+function glr_upload_mimes() {
+    return ['jpg|jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif', 'avif' => 'image/avif', 'mp4|m4v' => 'video/mp4', 'webm' => 'video/webm', 'ogv' => 'video/ogg', 'mov' => 'video/quicktime', 'mp3' => 'audio/mpeg', 'm4a' => 'audio/mp4', 'wav' => 'audio/wav', 'ogg|oga' => 'audio/ogg', 'flac' => 'audio/flac', 'aac' => 'audio/aac', 'pdf' => 'application/pdf', 'doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'xls' => 'application/vnd.ms-excel', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'ppt' => 'application/vnd.ms-powerpoint', 'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'odt' => 'application/vnd.oasis.opendocument.text', 'ods' => 'application/vnd.oasis.opendocument.spreadsheet', 'odp' => 'application/vnd.oasis.opendocument.presentation', 'rtf' => 'application/rtf', 'txt' => 'text/plain', 'csv' => 'text/csv', 'zip' => 'application/zip'];
+}
+function glr_media_limit() { return min(64 * 1024 * 1024, wp_max_upload_size()); }
+function glr_media_kind($type) {
+    foreach (['image', 'video', 'audio'] as $kind) if (strpos($type, $kind . '/') === 0) return $kind;
+    return 'document';
+}
 function glr_store_asset($file, $bytes) {
     $id = (string)($file['id'] ?? wp_generate_uuid4());
-    if (!preg_match('/^[a-zA-Z0-9-]{1,128}$/', $id) || strlen($bytes) > 20 * 1024 * 1024) throw new InvalidArgumentException('Invalid image');
+    if (!preg_match('/^[a-zA-Z0-9-]{1,128}$/', $id) || !$bytes || strlen($bytes) > glr_media_limit()) throw new InvalidArgumentException('Invalid media file or upload limit exceeded');
     $info = @getimagesizefromstring($bytes);
-    if (!$info || !in_array($info['mime'], ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'], true)) throw new InvalidArgumentException('Unsupported image');
+    $type = $info['mime'] ?? ($file['validated_type'] ?? '');
+    if (!in_array($type, array_values(glr_upload_mimes()), true) || (glr_media_kind($type) === 'image' && !$info)) throw new InvalidArgumentException('Unsupported media file');
     $sha = hash('sha256', $bytes);
     if (isset($file['sha256']) && !hash_equals($file['sha256'], $sha)) throw new InvalidArgumentException('Image checksum mismatch');
     $existing = glr_record('asset', $id);
@@ -145,7 +154,7 @@ function glr_store_asset($file, $bytes) {
     $path = glr_private_directory() . '/' . $id;
     if (file_put_contents($path, $bytes, LOCK_EX) !== strlen($bytes)) throw new RuntimeException('Image write failed');
     chmod($path, 0600);
-    return glr_put_record('asset', ['id' => $id, 'filename' => sanitize_file_name($file['filename'] ?? $id), 'type' => $info['mime'], 'bytes' => strlen($bytes), 'sha256' => $sha]);
+    return glr_put_record('asset', ['id' => $id, 'filename' => sanitize_file_name($file['filename'] ?? $id), 'type' => $type, 'bytes' => strlen($bytes), 'sha256' => $sha]);
 }
 
 add_action('rest_api_init', function () {
@@ -197,7 +206,7 @@ add_action('rest_api_init', function () {
     $route('/assets/(?P<id>[a-zA-Z0-9-]{1,128})', 'GET', function ($r) {
         $file = glr_record('asset', $r['id']);
         if (!$file || !glr_asset_is_public($r['id'])) return glr_error('Asset not found', 404);
-        return ['glr_stream' => $r['id'], 'type' => $file['type']];
+        return ['glr_stream' => $r['id'], 'type' => $file['type'], 'filename' => $file['filename']];
     });
 
 });
@@ -213,7 +222,7 @@ add_filter('rest_pre_serve_request', function ($served, $result, $request) {
     $quality = min(90, max(20, (int)($request->get_param('quality') ?: 80)));
     $format = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'avif' => 'image/avif'][$request->get_param('format') ?? ''] ?? $mime;
     $temporary = null;
-    if ($width || $height || $request->get_param('format') || $request->get_param('quality')) {
+    if (glr_media_kind($mime) === 'image' && ($width || $height || $request->get_param('format') || $request->get_param('quality'))) {
         $editor = wp_get_image_editor($path);
         if (!is_wp_error($editor)) {
             $editor->set_quality($quality);
@@ -224,14 +233,40 @@ add_filter('rest_pre_serve_request', function ($served, $result, $request) {
             }
         }
     }
-    header('Content-Type: ' . $mime); header('Cache-Control: private, no-store, max-age=0'); header('X-Content-Type-Options: nosniff');
-    header('Content-Length: ' . filesize($path)); readfile($path); if ($temporary) unlink($temporary); return true;
+    glr_stream_media($path, $mime, $data['filename'], $temporary ? '' : $request->get_header('range'));
+    if ($temporary) unlink($temporary); return true;
 }, 10, 3);
 
-function glr_uploaded_image($key) {
+function glr_byte_range($header, $size) {
+    if (!$header) return [0, $size - 1];
+    if ($size < 1 || strlen($header) > 100 || !preg_match('/^bytes=(\d*)-(\d*)$/', $header, $match) || ($match[1] === '' && $match[2] === '')) return false;
+    if ($match[1] === '') { $length = (int)$match[2]; return $length > 0 ? [max(0, $size - $length), $size - 1] : false; }
+    $start = (int)$match[1]; $end = $match[2] === '' ? $size - 1 : min((int)$match[2], $size - 1);
+    return $start < $size && $start <= $end ? [$start, $end] : false;
+}
+function glr_stream_media($path, $type, $filename, $range = '') {
+    $size = filesize($path); $bounds = glr_byte_range($range, $size);
+    header('Content-Type: ' . $type); header('Cache-Control: private, no-store, max-age=0'); header('X-Content-Type-Options: nosniff'); header('Accept-Ranges: bytes');
+    $disposition = glr_media_kind($type) === 'document' ? 'attachment' : 'inline';
+    header('Content-Disposition: ' . $disposition . "; filename*=UTF-8''" . rawurlencode($filename));
+    if ($bounds === false) { status_header(416); header('Content-Range: bytes */' . $size); header('Content-Length: 0'); return; }
+    [$start, $end] = $bounds;
+    if ($range) { status_header(206); header("Content-Range: bytes $start-$end/$size"); }
+    $remaining = max(0, $end - $start + 1); header('Content-Length: ' . $remaining);
+    $stream = fopen($path, 'rb');
+    if (!$stream) throw new RuntimeException('Cannot open media file');
+    fseek($stream, $start);
+    while ($remaining > 0 && !feof($stream) && !connection_aborted()) { $chunk = fread($stream, min(65536, $remaining)); if ($chunk === false || $chunk === '') break; echo $chunk; $remaining -= strlen($chunk); }
+    fclose($stream);
+}
+function glr_uploaded_media($key, $images_only = false) {
     if (empty($_FILES[$key]['tmp_name'])) return null;
-    if ($_FILES[$key]['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($_FILES[$key]['tmp_name'])) throw new RuntimeException('Image upload failed');
-    return glr_store_asset(['filename' => $_FILES[$key]['name']], file_get_contents($_FILES[$key]['tmp_name']))['id'];
+    $upload = $_FILES[$key];
+    if ($upload['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($upload['tmp_name'])) throw new RuntimeException('Upload failed. Check the file size and try again.');
+    if (filesize($upload['tmp_name']) > glr_media_limit()) throw new InvalidArgumentException('Upload limit exceeded');
+    $checked = wp_check_filetype_and_ext($upload['tmp_name'], $upload['name'], glr_upload_mimes());
+    if (!$checked['ext'] || !$checked['type'] || ($images_only && glr_media_kind($checked['type']) !== 'image')) throw new InvalidArgumentException($images_only ? 'Choose a supported image' : 'Unsupported file type or file contents');
+    return glr_store_asset(['filename' => $upload['name'], 'validated_type' => $checked['type']], file_get_contents($upload['tmp_name']))['id'];
 }
 add_action('add_meta_boxes', function () {
     add_meta_box('glr-editorial', 'Editorial details', function ($post) {
@@ -246,7 +281,7 @@ add_action('add_meta_boxes', function () {
             echo '<p><label>' . esc_html($label) . '<br><input class="widefat" type="' . $type . '" name="glr_' . $key . '" value="' . esc_attr(get_post_meta($post->ID, 'glr_' . $key, true)) . '"></label></p>';
         }
         foreach (['featured' => 'Featured on homepage', 'editor_pick' => "Editor's Pick"] as $key => $label) echo '<p><label><input type="checkbox" name="glr_' . $key . '" value="1" ' . checked(get_post_meta($post->ID, 'glr_' . $key, true), 1, false) . '> ' . esc_html($label) . '</label></p>';
-        echo '<p>Cover image: <code>' . esc_html(get_post_meta($post->ID, 'glr_cover_image', true)) . '</code><br><input type="file" name="glr_cover_upload" accept="image/jpeg,image/png,image/webp,image/gif,image/avif"></p><p>Upload inline images under GLR Media, then insert their website URL into the article editor. Article styling comes from the existing website.</p>';
+        echo '<p>Cover image: <code>' . esc_html(get_post_meta($post->ID, 'glr_cover_image', true)) . '</code><br><input type="file" name="glr_cover_upload" accept="image/jpeg,image/png,image/webp,image/gif,image/avif"></p><p>Use Upload media in the editor toolbar to add images, video, audio or downloadable files. Article styling comes from the existing website.</p>';
     }, 'glr_report', 'normal', 'high');
 });
 add_action('save_post_glr_report', function ($id) {
@@ -256,7 +291,7 @@ add_action('save_post_glr_report', function ($id) {
     foreach (['featured', 'editor_pick'] as $key) update_post_meta($id, 'glr_' . $key, isset($_POST['glr_' . $key]) ? 1 : 0);
     $category_id = (int)($_POST['glr_category'] ?? 0);
     wp_set_object_terms($id, $category_id ? [$category_id] : [], 'glr_category');
-    try { $image = glr_uploaded_image('glr_cover_upload'); if ($image) update_post_meta($id, 'glr_cover_image', $image); }
+    try { $image = glr_uploaded_media('glr_cover_upload', true); if ($image) update_post_meta($id, 'glr_cover_image', $image); }
     catch (Throwable $error) { set_transient('glr_notice_' . get_current_user_id(), $error->getMessage(), 60); }
     $post = get_post($id);
     if (in_array($post->post_status, ['publish', 'future'], true) && (!$category_id || !get_post_meta($id, 'glr_cover_image', true) || !get_post_meta($id, 'glr_author', true) || !get_post_meta($id, 'glr_cover_alt', true) || !$post->post_excerpt || !$post->post_content)) {
@@ -266,6 +301,39 @@ add_action('save_post_glr_report', function ($id) {
 });
 add_action('admin_notices', function () { $key = 'glr_notice_' . get_current_user_id(); $notice = get_transient($key); if ($notice) { delete_transient($key); echo '<div class="notice notice-warning"><p>' . esc_html($notice) . '</p></div>'; } });
 add_filter('wp_editor_settings', function ($settings, $id) { if (get_post_type() === 'glr_report') $settings['media_buttons'] = false; return $settings; }, 10, 2);
+add_filter('tiny_mce_before_init', function ($settings, $id) {
+    if (get_post_type() !== 'glr_report' || $id !== 'content') return $settings;
+    $settings['toolbar1'] = 'glr_media,formatselect,fontselect,fontsizeselect,bold,italic,underline,strikethrough,forecolor,backcolor';
+    $settings['toolbar2'] = 'bullist,numlist,blockquote,alignleft,aligncenter,alignright,alignjustify,outdent,indent,link,unlink,glr_table,hr';
+    $settings['toolbar3'] = 'undo,redo,pastetext,removeformat,charmap,subscript,superscript,wp_help,fullscreen';
+    $settings['wordpress_adv_hidden'] = false;
+    $settings['block_formats'] = 'Paragraph=p;Heading 2=h2;Heading 3=h3;Heading 4=h4;Heading 5=h5;Heading 6=h6;Preformatted=pre';
+    $settings['font_formats'] = 'Arial=arial,helvetica,sans-serif;Georgia=georgia,palatino,serif;Times New Roman=times new roman,times,serif;Verdana=verdana,geneva,sans-serif;Courier New=courier new,courier,monospace';
+    $settings['fontsize_formats'] = '10pt 12pt 14pt 16pt 18pt 24pt 36pt';
+    return $settings;
+}, 10, 2);
+function glr_editor_asset($file) {
+    return ['id' => $file['id'], 'filename' => $file['filename'], 'type' => $file['type'], 'kind' => glr_media_kind($file['type']), 'preview' => html_entity_decode(wp_nonce_url(admin_url('admin-post.php?action=glr_media_preview&id=' . rawurlencode($file['id'])), 'glr_preview'), ENT_QUOTES | ENT_HTML5, 'UTF-8')];
+}
+add_action('admin_enqueue_scripts', function () {
+    $screen = get_current_screen();
+    if (!$screen || $screen->base !== 'post' || $screen->post_type !== 'glr_report') return;
+    wp_enqueue_script('glr-report-editor', plugins_url('report-editor.js', __FILE__), ['jquery', 'editor', 'quicktags'], '1.2.0', false);
+    wp_localize_script('glr-report-editor', 'glrReportEditor', ['ajaxUrl' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('glr_editor_media'), 'accept' => '.' . str_replace('|', ',.', implode('|', array_keys(glr_upload_mimes()))), 'maxBytes' => glr_media_limit(), 'assets' => array_map('glr_editor_asset', glr_records('asset'))]);
+});
+add_action('edit_form_after_title', function ($post) {
+    if ($post->post_type !== 'glr_report') return;
+    echo '<dialog id="glr-image-picker" aria-labelledby="glr-image-title" style="width:min(760px,90vw);max-height:85vh;overflow:auto"><h2 id="glr-image-title">Upload or insert media</h2><p><label>Upload file <input id="glr-inline-upload" type="file"></label> <button type="button" class="button" id="glr-upload-image">Upload</button></p><p id="glr-media-message" role="status" aria-live="polite"></p><p>Images, video, audio, PDF, Office/OpenDocument files, text, CSV and ZIP. Maximum upload: ' . esc_html(size_format(glr_media_limit())) . '.</p><div id="glr-image-library" style="display:flex;flex-wrap:wrap;gap:12px"></div><div id="glr-media-preview"></div><p><label>Description / link text (alt text for images)<br><input id="glr-image-alt" class="widefat" type="text"></label></p><p><label>Caption (optional)<br><input id="glr-image-caption" class="widefat" type="text"></label></p><p><button type="button" class="button button-primary" id="glr-insert-image" disabled>Insert media</button> <button type="button" class="button" id="glr-cancel-image">Cancel</button></p></dialog>';
+});
+add_action('wp_ajax_glr_editor_upload', function () {
+    if (!current_user_can('edit_posts')) wp_send_json_error(['message' => 'Forbidden'], 403);
+    check_ajax_referer('glr_editor_media', 'nonce');
+    try {
+        $id = glr_uploaded_media('glr_asset_upload');
+        if (!$id) wp_send_json_error(['message' => 'Choose a file to upload.'], 422);
+        wp_send_json_success(glr_editor_asset(glr_record('asset', $id)));
+    } catch (Throwable $error) { wp_send_json_error(['message' => $error->getMessage()], 422); }
+});
 add_action('admin_footer-post.php', function () { if (get_post_type() === 'glr_report') echo '<script>document.querySelector("#post_status")?.add(new Option("Archived","glr_archived",false,' . (get_post_status() === 'glr_archived' ? 'true' : 'false') . '));</script>'; });
 
 function glr_category_fields($term = null) {
@@ -278,7 +346,7 @@ add_action('glr_category_edit_form_fields', 'glr_category_fields');
 function glr_save_category($id) {
     if (!current_user_can('manage_categories') || empty($_POST['glr_category_nonce']) || !wp_verify_nonce($_POST['glr_category_nonce'], 'glr_save_category')) return;
     $image = sanitize_text_field(wp_unslash($_POST['glr_cover_image'] ?? ''));
-    if (!$image || glr_record('asset', $image)) update_term_meta($id, 'glr_cover_image', $image);
+    if (!$image || (($file = glr_record('asset', $image)) && glr_media_kind($file['type']) === 'image')) update_term_meta($id, 'glr_cover_image', $image);
     update_term_meta($id, 'glr_sort', (int)($_POST['glr_sort'] ?? 0));
 }
 add_action('created_glr_category', 'glr_save_category'); add_action('edited_glr_category', 'glr_save_category');
@@ -292,10 +360,13 @@ function glr_media_admin() {
     if (!current_user_can('edit_posts')) return;
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         check_admin_referer('glr_media');
-        try { glr_uploaded_image('glr_asset_upload'); } catch (Throwable $error) { echo '<div class="notice notice-error"><p>' . esc_html($error->getMessage()) . '</p></div>'; }
+        try { glr_uploaded_media('glr_asset_upload'); } catch (Throwable $error) { echo '<div class="notice notice-error"><p>' . esc_html($error->getMessage()) . '</p></div>'; }
     }
-    echo '<div class="wrap"><h1>GLR Media</h1><p>Original images are stored outside the public website directory. Only images referenced by published content are served to visitors.</p><form method="post" enctype="multipart/form-data">'; wp_nonce_field('glr_media'); echo '<input type="file" name="glr_asset_upload" accept="image/*" required> '; submit_button('Upload image', 'primary', 'submit', false); echo '</form><table class="widefat striped"><thead><tr><th>Preview</th><th>Filename</th><th>Image ID</th><th>Website URL</th></tr></thead><tbody>';
-    foreach (glr_records('asset') as $file) echo '<tr><td><img style="max-width:120px;max-height:90px" alt="" loading="lazy" src="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=glr_media_preview&id=' . rawurlencode($file['id'])), 'glr_preview')) . '"></td><td>' . esc_html($file['filename']) . '</td><td><code>' . esc_html($file['id']) . '</code></td><td><code>/api/assets/' . esc_html($file['id']) . '</code></td></tr>';
+    echo '<div class="wrap"><h1>GLR Media</h1><p>Media files are stored outside the public website directory. Only files referenced by published content are served to visitors.</p><form method="post" enctype="multipart/form-data">'; wp_nonce_field('glr_media'); echo '<input type="file" name="glr_asset_upload" required> '; submit_button('Upload media', 'primary', 'submit', false); echo '</form><table class="widefat striped"><thead><tr><th>Preview</th><th>Filename</th><th>Image ID</th><th>Website URL</th></tr></thead><tbody>';
+    foreach (glr_records('asset') as $file) {
+        $preview = esc_url(wp_nonce_url(admin_url('admin-post.php?action=glr_media_preview&id=' . rawurlencode($file['id'])), 'glr_preview'));
+        echo '<tr><td>' . (glr_media_kind($file['type']) === 'image' ? '<img style="max-width:120px;max-height:90px" alt="" loading="lazy" src="' . $preview . '">' : '<a href="' . $preview . '">Preview / download ' . esc_html(glr_media_kind($file['type'])) . '</a>') . '</td><td>' . esc_html($file['filename']) . '</td><td><code>' . esc_html($file['id']) . '</code></td><td><code>/api/assets/' . esc_html($file['id']) . '</code></td></tr>';
+    }
     echo '</tbody></table></div>';
 }
 add_action('admin_post_glr_media_preview', function () {
@@ -305,7 +376,7 @@ add_action('admin_post_glr_media_preview', function () {
     if (!preg_match('/^[a-zA-Z0-9-]{1,128}$/', $id) || !($file = glr_record('asset', $id))) wp_die('Not found', '', ['response' => 404]);
     $path = glr_private_directory() . '/' . $id;
     if (!is_file($path)) wp_die('Not found', '', ['response' => 404]);
-    nocache_headers(); header('Content-Type: ' . $file['type']); header('X-Content-Type-Options: nosniff'); readfile($path); exit;
+    glr_stream_media($path, $file['type'], $file['filename'], $_SERVER['HTTP_RANGE'] ?? ''); exit;
 });
 function glr_records_admin($kind) {
     if (!current_user_can('manage_glr_records')) return;

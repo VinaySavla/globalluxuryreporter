@@ -24,21 +24,25 @@ export async function GET(request, { params }) {
   }
 
   try {
-    // WordPress repeats the publication check before reading private image storage.
-    const upstream = await wordpressFetch(`/assets/${encodeURIComponent(id)}${query.size ? `?${query}` : ''}`);
+    const range = request.headers.get('range');
+    if (range && (range.length > 100 || !/^bytes=(?:\d+-\d*|-\d+)$/.test(range))) return NextResponse.json({ error: 'Invalid media range' }, { status: 400 });
+    // WordPress repeats the publication check for every full or partial media request.
+    const upstream = await wordpressFetch(`/assets/${encodeURIComponent(id)}${query.size ? `?${query}` : ''}`, range ? { headers: { Range: range } } : {});
+    if (upstream.status === 416) return new Response(null, { status: 416, headers: { 'Content-Range': upstream.headers.get('content-range') || 'bytes */0', 'Cache-Control': 'private, no-store', 'Accept-Ranges': 'bytes' } });
     if (!upstream.ok) {
       return NextResponse.json({ error: upstream.status === 404 ? 'Asset not found' : 'Asset service unavailable' }, { status: upstream.status === 404 ? 404 : 502 });
     }
 
     const headers = new Headers();
-    for (const name of ['content-type', 'content-length', 'etag', 'last-modified']) {
+    for (const name of ['content-type', 'content-length', 'content-range', 'accept-ranges', 'content-disposition', 'etag', 'last-modified']) {
       const value = upstream.headers.get(name);
       if (value) headers.set(name, value);
     }
     // Authorization depends on the asset still being referenced by published content.
     // Never let a browser or CDN outlive that authorization decision.
     headers.set('cache-control', 'private, no-store, max-age=0');
-    return new Response(upstream.body, { status: 200, headers });
+    headers.set('X-Content-Type-Options', 'nosniff');
+    return new Response(upstream.body, { status: upstream.status, headers });
   } catch (error) {
     console.error('WordPress asset proxy failed', error);
     return NextResponse.json({ error: 'Asset service unavailable' }, { status: 502 });

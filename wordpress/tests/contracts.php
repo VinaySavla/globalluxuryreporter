@@ -8,6 +8,10 @@ function register_activation_hook(...$args) {}
 function register_rest_route($namespace, $path, $options) { global $routes; $routes[$path][$options['methods']] = $options; }
 function __return_false() { return false; }
 function __return_empty_array() { return []; }
+function get_post_type() { return 'glr_report'; }
+function wp_max_upload_size() { return 64 * 1024 * 1024; }
+function admin_url($path) { return 'https://cms.example/wp-admin/' . $path; }
+function wp_nonce_url($url, $action) { return htmlspecialchars($url . '&_wpnonce=test', ENT_QUOTES); }
 class WP_Error {
     public $data;
     public function __construct($code, $message, $data) { $this->data = $data; }
@@ -64,6 +68,21 @@ try { glr_store_asset(['id' => 'test'], '<svg onload="alert(1)"></svg>'); } catc
 expect($blocked, 'Executable image formats must be rejected');
 foreach ($actions['rest_api_init'] as $register) $register();
 foreach (array_keys($routes) as $path) expect(strpos($path, '/migration/') !== 0, 'Retired import and audit endpoints must stay removed');
+$editor_settings = call_user_func($filters['tiny_mce_before_init'][0], [], 'content');
+expect(strpos($editor_settings['toolbar1'], 'fontsizeselect') !== false && strpos($editor_settings['toolbar2'], 'glr_table') !== false && $editor_settings['wordpress_adv_hidden'] === false, 'Report editor must expose formatting and table controls');
+expect(call_user_func($filters['tiny_mce_before_init'][0], ['original' => true], 'excerpt') === ['original' => true], 'Other editors must stay unchanged');
+expect(isset($actions['wp_ajax_glr_editor_upload']) && !isset($actions['wp_ajax_nopriv_glr_editor_upload']), 'Inline uploads must require an authenticated WordPress session');
+$preview = glr_editor_asset(['id' => 'image-1', 'filename' => 'Example.jpg', 'type' => 'image/jpeg']);
+expect(strpos($preview['preview'], '&id=image-1&_wpnonce=test') !== false && strpos($preview['preview'], '&amp;') === false, 'JSON image preview URLs must not contain HTML entities');
+expect(strpos($editor_settings['toolbar1'], 'glr_media') === 0, 'Upload media must be inside the visual toolbar');
+expect(glr_media_kind('video/mp4') === 'video' && glr_media_kind('audio/mpeg') === 'audio' && glr_media_kind('application/pdf') === 'document', 'Media must use the appropriate player or download link');
+expect(!in_array('text/html', glr_upload_mimes(), true) && !in_array('image/svg+xml', glr_upload_mimes(), true), 'Executable document types must stay blocked');
+foreach (['mp4', 'mp3', 'pdf', 'docx', 'xlsx', 'pptx', 'zip'] as $extension) expect(isset(glr_upload_mimes()[$extension]) || $extension === 'mp4', 'Common media types must be supported');
+expect(glr_byte_range('bytes=0-9', 100) === [0, 9], 'Media must support a bounded byte range');
+expect(glr_byte_range('bytes=95-', 100) === [95, 99], 'Media must support open-ended byte ranges');
+expect(glr_byte_range('bytes=-10', 100) === [90, 99], 'Media must support suffix byte ranges');
+expect(glr_byte_range('bytes=0-999', 100) === [0, 99], 'Byte ranges must stop at the end of the file');
+foreach (['bytes=100-', 'bytes=-0', 'bytes=10-1', 'bytes=0-1,3-4', 'bytes=-'] as $invalid_range) expect(glr_byte_range($invalid_range, 100) === false, 'Invalid or unsatisfiable ranges must fail');
 foreach ($routes as $path => $methods) foreach ($methods as $route) expect($route['permission_callback'] === 'glr_permission', 'Every GLR endpoint must authenticate');
 class SubscriberDatabase {
     public $prefix = 'test_';

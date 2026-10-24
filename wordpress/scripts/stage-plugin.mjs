@@ -18,5 +18,6 @@ catch (error) {
 const output = join(root, 'deploy', 'glr-cms');
 await mkdir(output, { recursive: true });
 await copyFile('wordpress/glr-cms/glr-cms.php', join(output, 'glr-cms.php'));
+await copyFile('wordpress/glr-cms/report-editor.js', join(output, 'report-editor.js'));
 await writeFile(join(output, 'service-key.php'), `<?php\nif (!defined('ABSPATH')) exit;\nreturn '${createHash('sha256').update(credentials.token).digest('hex')}';\n`);
 console.log(JSON.stringify({ stagingDirectory: output, credentialsStoredPrivately: true }));
