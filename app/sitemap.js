@@ -1,4 +1,4 @@
-import { getSitemapContent } from '@/lib/api';
+import { getSitemapContent } from '@/lib/data-service';
 import { absoluteUrl } from '@/lib/site';
 
 export default async function sitemap() {

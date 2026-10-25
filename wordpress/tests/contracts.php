@@ -12,6 +12,12 @@ function get_post_type() { return 'glr_report'; }
 function wp_max_upload_size() { return 64 * 1024 * 1024; }
 function admin_url($path) { return 'https://cms.example/wp-admin/' . $path; }
 function wp_nonce_url($url, $action) { return htmlspecialchars($url . '&_wpnonce=test', ENT_QUOTES); }
+$preview_caps = [];
+function current_user_can($capability, ...$args) { global $preview_caps; return in_array($capability, $preview_caps, true); }
+function get_post($id) { return $id ? (object)['ID' => $id, 'post_type' => 'glr_report'] : null; }
+function absint($value) { return abs((int)$value); }
+function wp_die($message, $title = '', $args = []) { throw new RuntimeException($message, $args['response'] ?? 500); }
+function check_admin_referer($action) { throw new RuntimeException($action, 403); }
 class WP_Error {
     public $data;
     public function __construct($code, $message, $data) { $this->data = $data; }
@@ -42,6 +48,26 @@ class WP_Query {
 }
 function expect($condition, $message) { if (!$condition) throw new RuntimeException($message); }
 require dirname(__DIR__) . '/glr-cms/glr-cms.php';
+expect(isset($actions['admin_post_glr_report_preview']) && !isset($actions['admin_post_nopriv_glr_report_preview']), 'Report previews must require a logged-in session');
+$report = (object)['ID' => 6, 'post_type' => 'glr_report'];
+expect(!glr_can_preview_report($report) && !glr_can_preview_report(null), 'Anonymous or missing reports must not be previewable');
+$preview_caps = ['edit_post'];
+expect(!glr_can_preview_report($report), 'Editors must not receive administrator previews');
+$preview_caps = ['manage_options'];
+expect(!glr_can_preview_report($report), 'Administrator capability alone must not bypass report edit permission');
+$preview_caps[] = 'edit_post';
+expect(glr_can_preview_report($report), 'Administrators who can edit the report must be allowed');
+expect(!glr_can_preview_report((object)['ID' => 6, 'post_type' => 'page']), 'Other post types must not use report previews');
+$_SERVER['REQUEST_METHOD'] = 'GET';
+try { $actions['admin_post_glr_report_preview'][0](); throw new RuntimeException('GET unexpectedly allowed'); }
+catch (RuntimeException $error) { expect($error->getCode() === 405, 'Preview must require POST'); }
+$_SERVER['REQUEST_METHOD'] = 'POST'; $_POST['post_id'] = '6'; $preview_caps = [];
+try { $actions['admin_post_glr_report_preview'][0](); throw new RuntimeException('Anonymous preview unexpectedly allowed'); }
+catch (RuntimeException $error) { expect($error->getCode() === 403 && $error->getMessage() === 'Forbidden', 'Preview handler must check capabilities before accessing content'); }
+$preview_caps = ['manage_options', 'edit_post'];
+try { $actions['admin_post_glr_report_preview'][0](); throw new RuntimeException('Missing nonce unexpectedly allowed'); }
+catch (RuntimeException $error) { expect($error->getMessage() === 'glr_report_preview_6', 'Preview nonce must be bound to the requested report'); }
+$_POST = []; $preview_caps = [];
 expect(glr_service_allowed() === false, 'Anonymous CMS access must fail');
 $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer invalid';
 expect(glr_service_allowed() === false, 'Invalid key must fail');

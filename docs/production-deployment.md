@@ -8,6 +8,8 @@
 
 The CMS domain connection and HTTPS were verified on 24 October 2026. Both WordPress URL settings use HTTPS, and the existing GLR database `u353810860_BViHU` and administrator password were preserved. The root domain belongs to the Vercel frontend; its final connection remains part of the owner's deployment. Preserve unrelated Hostinger sites and existing DNS records.
 
+The former GLR CMS was retired on 24 October 2026: its dedicated container/network and scheduled backup job were removed from active service, its configuration/files were moved into a private recovery backup, and its old database was deleted after confirmation. The former hostname returns HTTP 410. WordPress is the only active GLR backend. Verified recovery copies are kept outside this repository; unrelated server applications and Hostinger resources were preserved.
+
 ## Environment configuration
 
 The ignored `.env.vercel.local` file contains the production environment values, including the private WordPress service token, a new cryptographically random subscription secret and Gmail SMTP credentials. Import its values into the Vercel project's **Production** environment before deploying. A Git push does not upload ignored environment files. Do not commit this file or paste its secrets into public logs.
@@ -45,3 +47,5 @@ Backups must include both the WordPress database and `glr-private-media` outside
 ## Checks after the owner's Vercel deployment
 
 Connect `readglr.com` to the intended Vercel project using the exact DNS values supplied by that project, while retaining the separate `marketing` backend record. Verify `/api/health`, homepage, category pages, reports, search, images, sitemap, RSS and a complete subscribe/confirm/unsubscribe cycle on the real production domain. The local checks cannot establish that a future Vercel deployment has the correct environment or DNS.
+
+The GLR plugin's media toolbar is live, but the expanded audio/video HTML allowlist, document links and byte-range proxy are frontend source changes. Deploy the updated Next.js project before relying on audio/video playback and file downloads on the public site. After deployment, check playback and seeking plus a document download from an owner-approved published report.

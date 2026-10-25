@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import Pagination from '@/components/Pagination';
 import ReportCard from '@/components/ReportCard';
 import SiteShell from '@/components/SiteShell';
-import { getCategories, getReports } from '@/lib/api';
+import { getCategories, getReports } from '@/lib/data-service';
 
 export async function generateMetadata({ params, searchParams }) { const { slug } = await params; const { page } = await searchParams; const categories = await getCategories(); const category = slug === 'all' ? { name: 'All Reports', description: 'The latest stories from Global Luxury Reporter.' } : categories.find((item) => item.slug === slug); const suffix = Number(page) > 1 ? `?page=${Number(page)}` : ''; return { title: category?.name || 'Reports', description: category?.description, alternates: { canonical: `/categories/${slug}${suffix}` }, openGraph: { title: category?.name || 'Reports', description: category?.description, url: `/categories/${slug}${suffix}` } }; }
 

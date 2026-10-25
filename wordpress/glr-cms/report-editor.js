@@ -60,6 +60,18 @@
     });
   });
   jQuery(function () {
+    document.getElementById('glr-preview-report')?.addEventListener('click', function () {
+      const form = document.createElement('form');
+      form.method = 'POST'; form.action = this.dataset.url; form.target = '_blank'; form.rel = 'noopener';
+      const values = { action: 'glr_report_preview', post_id: this.dataset.id, _wpnonce: this.dataset.nonce };
+      for (const name of ['post_title', 'excerpt', 'glr_author', 'glr_cover_alt', 'glr_reading_time', 'glr_category']) values[name] = document.querySelector('[name="' + name + '"]')?.value || '';
+      const editor = typeof tinymce !== 'undefined' && tinymce.get('content');
+      values.post_content = editor && !editor.isHidden() ? editor.getContent() : document.getElementById('content').value;
+      for (const [name, value] of Object.entries(values)) {
+        const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value; form.append(input);
+      }
+      document.body.append(form); form.submit(); form.remove();
+    });
     const dialog = document.getElementById('glr-image-picker');
     if (!dialog) return;
     const library = document.getElementById('glr-image-library');

@@ -1,6 +1,6 @@
 import ReportCard from '@/components/ReportCard';
 import SiteShell from '@/components/SiteShell';
-import { getReports } from '@/lib/api';
+import { getReports } from '@/lib/data-service';
 
 export const metadata = { title: 'Search', robots: { index: false, follow: true } };
 

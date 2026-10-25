@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import ReportCard from '@/components/ReportCard';
 import ShareActions from '@/components/ShareActions';
 import SiteShell from '@/components/SiteShell';
-import { getReport, getReports } from '@/lib/api';
+import { getReport, getReports } from '@/lib/data-service';
 import { formatReportDate } from '@/lib/format';
 import { absoluteUrl } from '@/lib/site';
 

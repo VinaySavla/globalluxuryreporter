@@ -1,4 +1,4 @@
-import { getReports } from '@/lib/api';
+import { getReports } from '@/lib/data-service';
 import { absoluteUrl } from '@/lib/site';
 
 function xml(value) {

@@ -54,6 +54,6 @@ No `NEXT_PUBLIC_API_URL`, Express/Fastify server, CORS configuration, or second 
 
 - Reports are WordPress `glr_report` posts with the existing report fields in post metadata.
 - Categories are `glr_category` terms with cover image, source ID and sort metadata.
-- Enquiries, subscribers and image metadata live in the new installation's `glr_records` table; rate limits use its `glr_attempts` table. WordPress adds its own table prefix.
-- Original images are stored outside `public_html`, in the new site's `glr-private-media` directory.
+- Enquiries, subscribers and media metadata live in the installation's `glr_records` table; rate limits use its `glr_attempts` table. WordPress adds its own table prefix.
+- Original media files are stored outside `public_html`, in the site's `glr-private-media` directory.
 - Blog comments and pingbacks are disabled at the server, including REST and XML-RPC entry points.

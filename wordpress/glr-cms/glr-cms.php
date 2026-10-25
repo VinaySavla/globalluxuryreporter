@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GLR Editorial CMS
  * Description: Private editorial backend for the existing Global Luxury Reporter frontend.
- * Version: 1.2.0
+ * Version: 1.3.0
  */
 if (!defined('ABSPATH')) exit;
 
@@ -315,10 +315,66 @@ add_filter('tiny_mce_before_init', function ($settings, $id) {
 function glr_editor_asset($file) {
     return ['id' => $file['id'], 'filename' => $file['filename'], 'type' => $file['type'], 'kind' => glr_media_kind($file['type']), 'preview' => html_entity_decode(wp_nonce_url(admin_url('admin-post.php?action=glr_media_preview&id=' . rawurlencode($file['id'])), 'glr_preview'), ENT_QUOTES | ENT_HTML5, 'UTF-8')];
 }
+function glr_can_preview_report($post) {
+    return $post && $post->post_type === 'glr_report' && current_user_can('manage_options') && current_user_can('edit_post', $post->ID);
+}
+add_action('post_submitbox_misc_actions', function ($post) {
+    if (!glr_can_preview_report($post)) return;
+    echo '<div class="misc-pub-section"><button type="button" class="button" id="glr-preview-report" data-url="' . esc_url(admin_url('admin-post.php')) . '" data-id="' . (int)$post->ID . '" data-nonce="' . esc_attr(wp_create_nonce('glr_report_preview_' . $post->ID)) . '">Preview report</button><p class="description">Opens current editor content privately without saving. Save a new cover image first.</p></div>';
+});
+function glr_report_preview_html($html) {
+    $tags = new WP_HTML_Tag_Processor(wp_kses_post($html));
+    while ($tags->next_tag()) {
+        foreach (['src', 'href', 'poster'] as $attribute) {
+            $url = $tags->get_attribute($attribute);
+            if (!is_string($url)) continue;
+            $path = wp_parse_url($url, PHP_URL_PATH);
+            if (is_string($path) && preg_match('~^/(?:api/)?assets/([a-zA-Z0-9-]{1,128})(?:\.(?:jpe?g|png|webp|gif|avif))?$~i', $path, $match)) {
+                $file = glr_record('asset', $match[1]);
+                if ($file) $tags->set_attribute($attribute, glr_editor_asset($file)['preview']);
+                else $tags->remove_attribute($attribute);
+            }
+        }
+        if ($tags->get_attribute('target') === '_blank') $tags->set_attribute('rel', 'noopener noreferrer');
+        if (in_array($tags->get_tag(), ['VIDEO', 'AUDIO'], true)) {
+            $tags->set_attribute('controls', true); $tags->set_attribute('preload', 'metadata'); $tags->remove_attribute('autoplay');
+        }
+    }
+    return $tags->get_updated_html();
+}
+add_action('admin_post_glr_report_preview', function () {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') wp_die('Use Preview report in the editor.', '', ['response' => 405]);
+    $id = isset($_POST['post_id']) && is_scalar($_POST['post_id']) ? absint($_POST['post_id']) : 0;
+    $post = $id ? get_post($id) : null;
+    if (!glr_can_preview_report($post)) wp_die('Forbidden', '', ['response' => 403]);
+    check_admin_referer('glr_report_preview_' . $id);
+    $fields = [];
+    foreach (['post_title', 'post_content', 'excerpt', 'glr_author', 'glr_cover_alt', 'glr_reading_time', 'glr_category'] as $key) {
+        if (isset($_POST[$key]) && !is_string($_POST[$key])) wp_die('Invalid preview fields.', '', ['response' => 400]);
+        $fields[$key] = wp_unslash($_POST[$key] ?? '');
+    }
+    $body = glr_report_preview_html($fields['post_content']);
+    $cover = glr_record('asset', get_post_meta($id, 'glr_cover_image', true));
+    $category = get_term(absint($fields['glr_category']), 'glr_category');
+    nocache_headers();
+    header('Content-Type: text/html; charset=UTF-8');
+    header('Cache-Control: private, no-store, max-age=0');
+    header('X-Robots-Tag: noindex, nofollow, noarchive');
+    header('Referrer-Policy: no-referrer');
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>Preview: ' . esc_html(sanitize_text_field($fields['post_title'])) . '</title><style>body{margin:0;background:#faf9f6;color:#252525;font:18px/1.7 Georgia,serif}aside{padding:12px 24px;background:#222;color:#fff;font:14px/1.5 Arial,sans-serif}main{max-width:800px;margin:48px auto;padding:0 24px 64px}h1{font-size:clamp(32px,6vw,52px);line-height:1.15}img,video{max-width:100%;height:auto}audio{max-width:100%}figure{margin:24px 0}figcaption{font-size:14px}table{border-collapse:collapse;max-width:100%}td,th{border:1px solid #ccc;padding:8px}a{color:#675021}blockquote{border-left:3px solid #aa9158;padding-left:20px}pre{overflow:auto}.meta{font:14px/1.6 Arial,sans-serif}.excerpt{font-size:22px}</style></head><body><aside>Administrator preview · Unsaved editor content · This does not publish or save the report. Newly selected cover images require saving first.</aside><main>';
+    if ($category && !is_wp_error($category)) echo '<p class="meta">' . esc_html($category->name) . '</p>';
+    echo '<h1>' . esc_html(sanitize_text_field($fields['post_title'])) . '</h1><p class="meta">' . esc_html(sanitize_text_field($fields['glr_author'])) . ' · ' . max(1, absint($fields['glr_reading_time'])) . ' min read</p><p class="excerpt">' . esc_html(sanitize_textarea_field($fields['excerpt'])) . '</p>';
+    if ($cover && glr_media_kind($cover['type']) === 'image') echo '<figure><img src="' . esc_url(glr_editor_asset($cover)['preview']) . '" alt="' . esc_attr(sanitize_text_field($fields['glr_cover_alt'])) . '"></figure>';
+    echo '<article>' . wpautop($body) . '</article></main></body></html>';
+    exit;
+});
 add_action('admin_enqueue_scripts', function () {
     $screen = get_current_screen();
     if (!$screen || $screen->base !== 'post' || $screen->post_type !== 'glr_report') return;
-    wp_enqueue_script('glr-report-editor', plugins_url('report-editor.js', __FILE__), ['jquery', 'editor', 'quicktags'], '1.2.0', false);
+    wp_enqueue_script('glr-report-editor', plugins_url('report-editor.js', __FILE__), ['jquery', 'editor', 'quicktags'], '1.3.0', false);
     wp_localize_script('glr-report-editor', 'glrReportEditor', ['ajaxUrl' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('glr_editor_media'), 'accept' => '.' . str_replace('|', ',.', implode('|', array_keys(glr_upload_mimes()))), 'maxBytes' => glr_media_limit(), 'assets' => array_map('glr_editor_asset', glr_records('asset'))]);
 });
 add_action('edit_form_after_title', function ($post) {

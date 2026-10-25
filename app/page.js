@@ -3,7 +3,7 @@ import Link from 'next/link';
 import HeroSlider from '@/components/HeroSlider';
 import ReportCard from '@/components/ReportCard';
 import SiteShell from '@/components/SiteShell';
-import { getCategories, getReports } from '@/lib/api';
+import { getCategories, getReports } from '@/lib/data-service';
 import { reportMeta } from '@/lib/format';
 
 export default async function HomePage() {

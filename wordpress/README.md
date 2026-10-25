@@ -17,6 +17,7 @@ WordPress is the project's only editorial backend.
 5. In the report editor toolbar, use **Upload media** to upload or choose an existing file, enter its description/link text and optional caption, then select **Insert media**. Images appear inline, video/audio use players, and documents become download links. The same toolbar button is available in Code mode. **GLR Media** also manages these files; category and report covers still require images.
 6. **GLR Enquiries** manages enquiry status. **GLR Subscribers** displays subscriber state and consent metadata and supports status changes. Administrators can assign the GLR Editor role to editorial staff.
 7. Comments are disabled server-side, regardless of editor settings. There is no public comment UI in the Next.js site.
+8. Administrators can select **Preview report** in the Publish panel. It opens the current unsaved title, summary, body, category and byline in a private article preview, including uploaded inline images, audio, video and document links. It does not save or publish the report. Save newly selected cover images first. This is a CMS content preview, not the complete frontend page layout. Preview requests require an administrator session, permission to edit that report and a report-specific nonce; previews are not cached or publicly shareable.
 
 ## Plugin packaging
 
@@ -37,6 +38,8 @@ All originals stay outside `public_html`. Authenticated editor previews work bef
 On 24 October 2026, version 1.2.0 was installed only on the GLR WordPress site. Live verification uploaded WAV, MP4 and TXT fixtures, checked the video preview, inserted them through both toolbar modes, saved an unpublished draft and checked that only stable frontend URLs were stored. The temporary report was moved to recoverable Trash; the three clearly named `GLR-media-verification` files remain private in GLR Media. No existing report was saved or published. Full and partial byte delivery was verified through the production CMS and local Next.js proxy, including invalid/unsatisfiable ranges. Other listed formats and browser codecs were not individually exercised.
 
 ## Verification and recovery
+
+On 24 October 2026, version 1.3.0 was installed only on the GLR WordPress site. Administrator report previews were verified live from Visual and Code modes, including cover and inline images. Anonymous report-preview and private-media requests were rejected. No existing report was saved or published during verification. Unsaved-content submission and administrator/report-specific permission checks also passed locally; audio/video playback was not repeated for this preview update.
 
 Run `npm test`, `npm run build`, `php -l wordpress/glr-cms/glr-cms.php` and `php wordpress/tests/contracts.php`. Publication, authentication, comments, uploads and subscription state have isolated contract checks.
 

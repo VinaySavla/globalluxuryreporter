@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import SiteShell from '@/components/SiteShell';
-import { getCategories } from '@/lib/api';
+import { getCategories } from '@/lib/data-service';
 
 export const metadata = { title: 'Our Mission', description: 'The mission, editorial perspective and global reach of Global Luxury Reporter.', alternates: { canonical: '/about' } };
 
