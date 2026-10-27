@@ -72,3 +72,16 @@ test('administrator preview submits unsaved visual or code content without savin
     assert.equal(removed, true);
   }
 });
+
+test('report status controls remove core save buttons and its competing status field', () => {
+  const removed = [];
+  vm.runInNewContext(readFileSync(new URL('../wordpress/glr-cms/report-editor.js', import.meta.url), 'utf8'), {
+    glrReportEditor: { assets: [] },
+    document: {
+      getElementById: id => id === 'glr-status-controls' ? {} : null,
+      querySelector: selector => ({ remove: () => removed.push(selector) })
+    },
+    jQuery: value => typeof value === 'function' ? value() : { on() {} }
+  });
+  assert.deepEqual(removed, ['#submitdiv #minor-publishing-actions', '#submitdiv .misc-pub-post-status', '#submitdiv #publishing-action']);
+});

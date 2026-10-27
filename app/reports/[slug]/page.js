@@ -15,8 +15,8 @@ export async function generateMetadata({ params }) {
     title: report.title,
     description: report.excerpt,
     alternates: { canonical: `/reports/${report.slug}` },
-    openGraph: { type: 'article', url: `/reports/${report.slug}`, title: report.title, description: report.excerpt, publishedTime: report.published_at, modifiedTime: report.date_updated || report.published_at, authors: [report.author], images: [{ url: report.cover_image, alt: report.cover_alt || report.title }] },
-    twitter: { card: 'summary_large_image', title: report.title, description: report.excerpt, images: [report.cover_image] }
+    openGraph: { type: 'article', url: `/reports/${report.slug}`, title: report.title, description: report.excerpt, publishedTime: report.published_at, modifiedTime: report.date_updated || report.published_at, authors: [report.author], images: report.cover_image ? [{ url: report.cover_image, alt: report.cover_alt || report.title }] : [] },
+    twitter: { card: report.cover_image ? 'summary_large_image' : 'summary', title: report.title, description: report.excerpt, images: report.cover_image ? [report.cover_image] : [] }
   } : { title: 'Report not found', robots: { index: false, follow: false } };
 }
 
@@ -30,7 +30,7 @@ export default async function ReportPage({ params }) {
   const date = formatReportDate(report.published_at);
   const structuredData = {
     '@context': 'https://schema.org', '@type': 'Article', headline: report.title, description: report.excerpt,
-    image: [absoluteUrl(report.cover_image)], datePublished: report.published_at, dateModified: report.date_updated || report.published_at,
+    ...(report.cover_image ? { image: [absoluteUrl(report.cover_image)] } : {}), datePublished: report.published_at, dateModified: report.date_updated || report.published_at,
     author: { '@type': 'Person', name: report.author },
     publisher: { '@type': 'Organization', name: 'Global Luxury Reporter', logo: { '@type': 'ImageObject', url: absoluteUrl('/GLR-Logo-dp.png') } },
     mainEntityOfPage: absoluteUrl(`/reports/${report.slug}`)
@@ -48,7 +48,7 @@ export default async function ReportPage({ params }) {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[10px] uppercase tracking-editorial text-ink/70"><span>By {report.author}</span><span>·</span><time dateTime={report.published_at}>{date}</time><span>·</span><span>{report.reading_time} min read</span></div>
         </header>
 
-        <figure className="editorial-container"><div className="relative aspect-[16/9] overflow-hidden bg-parchment"><Image src={report.cover_image} alt={report.cover_alt || report.title} fill priority sizes="100vw" unoptimized className="object-cover" /></div><figcaption className="mt-3 text-[9px] uppercase tracking-wider text-ink/45">{report.cover_alt || report.title} · GLR Archive</figcaption></figure>
+        {report.cover_image && <figure className="editorial-container"><div className="relative aspect-[16/9] overflow-hidden bg-parchment"><Image src={report.cover_image} alt={report.cover_alt || report.title} fill priority sizes="100vw" unoptimized className="object-cover" /></div><figcaption className="mt-3 text-[9px] uppercase tracking-wider text-ink/45">{report.cover_alt || report.title} · GLR Archive</figcaption></figure>}
 
         <div className="editorial-container grid gap-10 py-20 lg:grid-cols-[180px_minmax(0,760px)_1fr] lg:py-28">
           <aside className="lg:sticky lg:top-8 lg:self-start"><p className="eyebrow text-heading">Written by</p><p className="mt-3 font-serif text-2xl text-heading">{report.author}</p><p className="mt-3 text-[11px] leading-5 text-ink/55">Reporting on contemporary culture, craft and the changing language of luxury.</p><div className="mt-6"><ShareActions title={report.title} /></div></aside>

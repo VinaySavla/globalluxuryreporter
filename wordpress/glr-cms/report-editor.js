@@ -60,6 +60,10 @@
     });
   });
   jQuery(function () {
+    if (document.getElementById('glr-status-controls')) {
+      // Keep one submitted status field, outside WordPress's status-changing script.
+      for (const selector of ['#minor-publishing-actions', '.misc-pub-post-status', '#publishing-action']) document.querySelector('#submitdiv ' + selector)?.remove();
+    }
     document.getElementById('glr-preview-report')?.addEventListener('click', function () {
       const form = document.createElement('form');
       form.method = 'POST'; form.action = this.dataset.url; form.target = '_blank'; form.rel = 'noopener';
@@ -79,10 +83,11 @@
     const message = document.getElementById('glr-media-message');
     const preview = document.getElementById('glr-media-preview');
     document.getElementById('glr-inline-upload').accept = glrReportEditor.accept;
-    let selected = null;
+    let selected = null, coverMode = false;
     function renderLibrary() {
       library.replaceChildren();
       for (const asset of assets.values()) {
+        if (coverMode && asset.kind !== 'image') continue;
         const button = document.createElement('button'); button.type = 'button'; button.className = 'button';
         button.style.cssText = 'height:auto;max-width:150px;white-space:normal;padding:6px';
         button.setAttribute('aria-pressed', String(selected?.id === asset.id));
@@ -93,7 +98,7 @@
         button.addEventListener('click', () => { selected = asset; insert.disabled = false; renderLibrary(); showPreview(); });
         library.append(button);
       }
-      if (!assets.size) library.textContent = 'No media yet. Upload a file above.';
+      if (!library.childNodes.length) library.textContent = coverMode ? 'No images yet. Upload a cover above.' : 'No media yet. Upload a file above.';
     }
     function showPreview() {
       preview.replaceChildren();
@@ -101,11 +106,23 @@
         const player = document.createElement(selected.kind); player.controls = true; player.preload = 'metadata'; player.src = selected.preview; player.style.maxWidth = '100%'; preview.append(player);
       }
     }
-    openPicker = () => {
+    openPicker = (purpose) => {
+      coverMode = purpose === 'cover';
+      document.getElementById('glr-image-title').textContent = coverMode ? 'Choose cover image' : 'Upload or insert media';
+      insert.textContent = coverMode ? 'Use as cover' : 'Insert media';
+      document.getElementById('glr-inline-upload').accept = coverMode ? '.jpg,.jpeg,.png,.webp,.gif,.avif' : glrReportEditor.accept;
+      document.getElementById('glr-image-caption').closest('label').hidden = coverMode;
       selected = null; insert.disabled = true; message.textContent = '';
       document.getElementById('glr-image-alt').value = ''; document.getElementById('glr-image-caption').value = '';
       renderLibrary(); showPreview(); dialog.showModal();
     };
+    document.getElementById('glr-choose-cover')?.addEventListener('click', () => openPicker('cover'));
+    document.getElementById('glr-remove-cover')?.addEventListener('click', () => {
+      document.getElementById('glr-cover-image').value = '';
+      document.getElementById('glr-cover-id').textContent = '';
+      document.getElementById('glr-cover-upload').value = '';
+      document.getElementById('glr-cover-preview').replaceChildren();
+    });
     if (typeof QTags !== 'undefined') QTags.addButton('glr_media', 'Upload media', openPicker, '', '', 'Upload or insert media', 1, 'content');
     dialog.addEventListener('close', () => preview.replaceChildren());
     document.getElementById('glr-cancel-image').addEventListener('click', () => dialog.close());
@@ -114,18 +131,30 @@
       if (!file) { message.textContent = 'Choose a file first.'; return; }
       if (file.size > glrReportEditor.maxBytes) { message.textContent = 'This file exceeds the upload limit shown above.'; return; }
       const data = new FormData(); data.set('action', 'glr_editor_upload'); data.set('nonce', glrReportEditor.nonce); data.set('glr_asset_upload', file);
+      if (coverMode) data.set('glr_cover_only', '1');
       this.disabled = true; message.textContent = 'Uploading media…';
       try {
         const response = await fetch(glrReportEditor.ajaxUrl, { method: 'POST', body: data, credentials: 'same-origin' });
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.data?.message || 'Upload failed. Reload the editor and try again.');
-        assets.set(result.data.id, result.data); selected = result.data; insert.disabled = false; renderLibrary(); showPreview(); message.textContent = 'File uploaded. Add a description, then select Insert media.';
+        assets.set(result.data.id, result.data); selected = result.data; insert.disabled = false; renderLibrary(); showPreview(); message.textContent = coverMode ? 'Image uploaded. Select Use as cover.' : 'File uploaded. Add a description, then select Insert media.';
       } catch (error) { message.textContent = error.message; }
       finally { this.disabled = false; }
     });
     insert.addEventListener('click', function () {
       if (!selected) return;
       const kind = selected.kind || 'image';
+      if (coverMode) {
+        if (kind !== 'image') return;
+        document.getElementById('glr-cover-image').value = selected.id;
+        document.getElementById('glr-cover-id').textContent = selected.id;
+        document.getElementById('glr-cover-upload').value = '';
+        const image = document.createElement('img'); image.src = selected.preview; image.alt = 'Selected cover'; image.style.cssText = 'max-width:200px;max-height:140px';
+        document.getElementById('glr-cover-preview').replaceChildren(image);
+        const description = document.getElementById('glr-image-alt').value;
+        if (description) document.querySelector('[name="glr_cover_alt"]').value = description;
+        dialog.close(); return;
+      }
       const media = document.createElement(kind === 'document' ? 'a' : kind === 'image' ? 'img' : kind);
       const url = '/api/assets/' + selected.id, description = document.getElementById('glr-image-alt').value;
       if (kind === 'document') { media.href = url; media.textContent = description || selected.filename; }

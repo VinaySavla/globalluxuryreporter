@@ -71,7 +71,7 @@ export default async function HomePage() {
               {selectedEditorPicks.map((report, index) => (
                 <article key={report.slug} className="group w-full shrink-0 snap-start sm:w-auto">
                   <Link href={`/reports/${report.slug}`} className="relative block aspect-[3/4] overflow-hidden bg-ink/25">
-                    <Image src={report.cover_image} alt={report.cover_alt || report.title} fill sizes="(max-width:640px) calc(100vw - 40px), (max-width:1280px) 50vw, 25vw" unoptimized className="object-cover transition duration-700 group-hover:scale-105" />
+                    {report.cover_image && <Image src={report.cover_image} alt={report.cover_alt || report.title} fill sizes="(max-width:640px) calc(100vw - 40px), (max-width:1280px) 50vw, 25vw" unoptimized className="object-cover transition duration-700 group-hover:scale-105" />}
                     <div className="absolute inset-0 bg-gradient-to-t from-ink/55 via-transparent to-ink/10" />
                     <span className="absolute left-5 top-5 grid h-10 w-10 place-items-center border border-white/45 font-serif text-xl">{String(index + 1).padStart(2, '0')}</span>
                   </Link>

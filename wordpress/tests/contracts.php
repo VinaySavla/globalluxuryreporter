@@ -9,12 +9,32 @@ function register_rest_route($namespace, $path, $options) { global $routes; $rou
 function __return_false() { return false; }
 function __return_empty_array() { return []; }
 function get_post_type() { return 'glr_report'; }
+function get_post_status() { global $fixture_post; return $fixture_post->post_status ?? 'draft'; }
+function get_post_type_object($name) { global $fixture_types; return $fixture_types[$name] ?? null; }
 function wp_max_upload_size() { return 64 * 1024 * 1024; }
 function admin_url($path) { return 'https://cms.example/wp-admin/' . $path; }
 function wp_nonce_url($url, $action) { return htmlspecialchars($url . '&_wpnonce=test', ENT_QUOTES); }
 $preview_caps = [];
 function current_user_can($capability, ...$args) { global $preview_caps; return in_array($capability, $preview_caps, true); }
-function get_post($id) { return $id ? (object)['ID' => $id, 'post_type' => 'glr_report'] : null; }
+function get_post($id) { global $fixture_post; return $id ? ($fixture_post ?? (object)['ID' => $id, 'post_type' => 'glr_report']) : null; }
+function get_post_meta($id, $key, $single) { global $fixture_meta; return $fixture_meta[$key] ?? ''; }
+function update_post_meta($id, $key, $value) { global $fixture_meta; $fixture_meta[$key] = $value; }
+function wp_verify_nonce($nonce, $action) { return $nonce === 'valid'; }
+function wp_is_post_revision($id) { return false; }
+function wp_unslash($value) { return $value; }
+function sanitize_text_field($value) { return trim(strip_tags($value)); }
+function sanitize_email($value) { return trim($value); }
+function is_email($value) { return filter_var($value, FILTER_VALIDATE_EMAIL); }
+function wp_generate_uuid4() { return 'test-generated-id'; }
+function wp_set_object_terms(...$args) {}
+function get_current_user_id() { return 1; }
+function set_transient($key, $value, $ttl) { global $fixture_notice; $fixture_notice = $value; }
+function wp_update_post($data, $wp_error) {
+    global $fixture_post, $fixture_updates, $actions;
+    $fixture_updates[] = $data; $fixture_post->post_status = $data['post_status'];
+    $actions['save_post_glr_report'][0]($data['ID']);
+    return $data['ID'];
+}
 function absint($value) { return abs((int)$value); }
 function wp_die($message, $title = '', $args = []) { throw new RuntimeException($message, $args['response'] ?? 500); }
 function check_admin_referer($action) { throw new RuntimeException($action, 403); }
@@ -48,6 +68,8 @@ class WP_Query {
 }
 function expect($condition, $message) { if (!$condition) throw new RuntimeException($message); }
 require dirname(__DIR__) . '/glr-cms/glr-cms.php';
+ob_start(); $actions['post_edit_form_tag'][0](); $form_attributes = ob_get_clean();
+expect(strpos($form_attributes, 'enctype="multipart/form-data"') !== false, 'Report saves must send selected cover-image files');
 expect(isset($actions['admin_post_glr_report_preview']) && !isset($actions['admin_post_nopriv_glr_report_preview']), 'Report previews must require a logged-in session');
 $report = (object)['ID' => 6, 'post_type' => 'glr_report'];
 expect(!glr_can_preview_report($report) && !glr_can_preview_report(null), 'Anonymous or missing reports must not be previewable');
@@ -115,10 +137,20 @@ class SubscriberDatabase {
     public $record;
     public function prepare($sql, ...$args) { return $sql; }
     public function query($sql) { return true; }
-    public function get_var($sql) { return json_encode($this->record); }
+    public function get_var($sql) { return $this->record ? json_encode($this->record) : null; }
+    public function insert($table, $data) { $this->record = json_decode($data['data'], true); return 1; }
     public function update($table, $data, $where) { $this->record = json_decode($data['data'], true); return 1; }
 }
 $wpdb = new SubscriberDatabase();
+$new_subscriber = new WP_REST_Request();
+$new_subscriber->set_param('email', 'new@example.invalid');
+$new_subscriber->set_param('status', 'pending');
+$new_subscriber->set_param('consent_ip_hash', str_repeat('c', 64));
+$create = $routes['/subscribers']['POST']['callback'];
+expect($create($new_subscriber)->data['data']['status'] === 'active', 'New subscribers must start active even for the older frontend');
+expect($wpdb->record['consent_ip_hash'] === str_repeat('c', 64), 'New subscriptions must retain supplied consent metadata');
+$wpdb->record['status'] = 'unsubscribed';
+expect($create($new_subscriber)->data['data']['status'] === 'unsubscribed', 'Repeated registration must not silently reverse an unsubscribe');
 $wpdb->record = ['id' => 'subscriber-test', 'email' => 'nobody@example.invalid', 'status' => 'pending', 'confirmation_nonce_hash' => str_repeat('a', 64), 'confirmation_expires_at' => gmdate('c', time() + 60)];
 $request = new WP_REST_Request();
 foreach (['id' => 'subscriber-test', 'status' => 'active', 'expected_nonce_hash' => str_repeat('b', 64)] as $key => $value) $request->set_param($key, $value);
@@ -131,4 +163,58 @@ $wpdb->record['status'] = 'unsubscribed';
 expect($activate($request)->data['status'] === 409 && $wpdb->record['status'] === 'unsubscribed', 'Stale confirmation must never reverse unsubscribe');
 $wpdb->record['status'] = 'pending'; $wpdb->record['confirmation_expires_at'] = gmdate('c', time() - 60);
 expect($activate($request)->data['status'] === 409, 'Expired confirmation must not activate');
+
+$fixture_post = (object)['ID' => 6, 'post_type' => 'glr_report', 'post_status' => 'publish', 'post_title' => 'Complete report', 'post_content' => '<p>Body</p>', 'post_excerpt' => 'Summary'];
+$fixture_meta = ['glr_cover_image' => 'image-1', 'glr_author' => 'Writer', 'glr_cover_alt' => 'Cover'];
+expect(glr_report_missing_fields($fixture_post, 3) === [], 'Complete reports must pass publication checks');
+$fixture_post->post_excerpt = ' ';
+expect(glr_report_missing_fields($fixture_post, 3) === [], 'Blank excerpts must never block publication');
+expect(glr_report_missing_fields($fixture_post, 0) === ['Category'], 'Publication feedback must name only required fields');
+$fixture_post->post_content = ' ';
+$_POST = ['glr_nonce' => 'valid', 'glr_category' => '3', 'glr_author' => 'Writer', 'glr_cover_alt' => 'Cover'];
+$preview_caps = ['edit_post']; $fixture_updates = [];
+$actions['save_post_glr_report'][0](6);
+expect($fixture_post->post_status === 'draft' && count($fixture_updates) === 1, 'Incomplete publications must use the WordPress status API exactly once without recursion');
+expect(strpos($fixture_notice, 'Article body') !== false && strpos($fixture_notice, 'Excerpt') === false && strpos($fixture_notice, 'not published') !== false, 'Failed publication must explain only missing required fields');
+$fixture_post->post_content = '<p>Body</p>'; $fixture_post->post_excerpt = '';
+$fixture_meta['glr_cover_image'] = ''; $fixture_meta['glr_cover_alt'] = '';
+$_POST['glr_cover_image'] = ''; $_POST['glr_cover_alt'] = '';
+foreach (['publish', 'future', 'draft', 'pending', 'glr_archived'] as $status) {
+    $fixture_post->post_status = $status; $fixture_updates = [];
+    $actions['save_post_glr_report'][0](6);
+    expect($fixture_post->post_status === $status && !$fixture_updates, 'Empty excerpts, covers and unused cover descriptions must allow every report status');
+}
+$wpdb->record = ['id' => 'image-1', 'type' => 'image/jpeg'];
+expect(glr_cover_selection('image-1') === 'image-1', 'Existing GLR images can be selected as covers');
+expect(glr_cover_selection('') === '', 'Cover selection can be cleared');
+foreach ([null, [], '../image'] as $invalid_cover) {
+    try { glr_cover_selection($invalid_cover); throw new RuntimeException('Invalid cover unexpectedly allowed'); }
+    catch (InvalidArgumentException $error) {}
+}
+$wpdb->record = ['id' => 'document-1', 'type' => 'application/pdf'];
+try { glr_cover_selection('document-1'); throw new RuntimeException('Document cover unexpectedly allowed'); }
+catch (InvalidArgumentException $error) {}
+$wpdb->record = ['id' => 'image-1', 'type' => 'image/jpeg'];
+$_POST['glr_cover_image'] = 'image-1'; $_POST['glr_cover_alt'] = 'Cover';
+$fixture_post->post_status = 'publish'; $actions['save_post_glr_report'][0](6);
+expect($fixture_meta['glr_cover_image'] === 'image-1' && $fixture_post->post_status === 'publish', 'Selected media must persist on the report');
+$_POST['glr_cover_image'] = ''; $_POST['glr_cover_alt'] = '';
+$actions['save_post_glr_report'][0](6);
+expect($fixture_meta['glr_cover_image'] === '' && $fixture_post->post_status === 'publish', 'Removing a cover must persist without unpublishing the report');
+$removed_nodes = [];
+$bar = new class { function remove_node($id) { global $removed_nodes; $removed_nodes[] = $id; } };
+$actions['admin_bar_menu'][0]($bar);
+expect($removed_nodes === ['new-post', 'new-page'], 'Unused Posts and Pages toolbar creation links must be removed');
+$fixture_types = [];
+foreach (['post', 'page', 'glr_report'] as $name) $fixture_types[$name] = (object)['cap' => (object)['create_posts' => 'edit_posts']];
+$actions['init'][1]();
+expect($fixture_types['post']->cap->create_posts === 'do_not_allow' && $fixture_types['page']->cap->create_posts === 'do_not_allow', 'Native post/page creation must be disabled');
+expect($fixture_types['glr_report']->cap->create_posts === 'edit_posts', 'Report creation must remain available');
+$preview_caps = ['publish_posts'];
+foreach (['draft', 'pending', 'glr_archived', 'publish'] as $status) {
+    $fixture_post->post_status = $status;
+    expect(glr_report_status_options()['publish'] === 'Published', 'Published must remain available across repeated status changes');
+}
+$preview_caps = [];
+expect(!isset(glr_report_status_options()['publish']), 'The status selector must not offer publishing to users without permission');
 echo "GLR CMS publication, authentication, comments, uploads and subscription state contracts passed.\n";
