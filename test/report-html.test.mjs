@@ -2,6 +2,21 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { sanitizeReportHtml } from '../lib/report-html.js';
 
+test('legacy bare text and editor inline formatting become styled report paragraphs', () => {
+  const html = sanitizeReportHtml('<strong>Opening &amp; introduction.</strong>\r\n\r\nFirst body paragraph.\r\n\r\nSecond <em>body</em> paragraph.\r\n<h2>Section</h2>\r\nFinal paragraph.');
+  assert.equal(html, '<p><strong>Opening &amp; introduction.</strong></p><p>First body paragraph.</p><p>Second <em>body</em> paragraph.</p><h2>Section</h2><p>Final paragraph.</p>');
+  assert.equal(sanitizeReportHtml(html), html);
+});
+
+test('paragraph normalization preserves existing blocks, media and escaped text', () => {
+  const html = sanitizeReportHtml('<p>Existing paragraph.</p>\n<h2>Heading</h2>\nUnwrapped &lt;script&gt; text.\n\n<img src="/api/assets/image-1" alt="Image"><ul><li>List entry</li></ul><blockquote><p>Quoted text.</p></blockquote><pre>Code\n\nblock</pre><table><tbody><tr><td>Cell</td></tr></tbody></table>');
+  assert.ok(html.includes('<p>Unwrapped &lt;script&gt; text.</p>'));
+  for (const block of ['<p>Existing paragraph.</p>', '<h2>Heading</h2>', '<ul><li>List entry</li></ul>', '<blockquote><p>Quoted text.</p></blockquote>', '<pre>Code\n\nblock</pre>', '<td>Cell</td>']) assert.ok(html.includes(block), block);
+  assert.ok(!html.includes('<p><img') && !html.includes('<p><p>'));
+  assert.equal(sanitizeReportHtml(html), html);
+  assert.match(sanitizeReportHtml('<a name="section"></a><h2>Section</h2>'), /^<a name="section"[^>]*><\/a><h2>Section<\/h2>$/);
+});
+
 test('visual editor formatting, tables and image descriptions survive sanitization', () => {
   const html = sanitizeReportHtml('<h2>Title</h2><p style="text-align:center;padding-left:40px"><span style="font-family:georgia,palatino,serif;font-size:18pt;color:#112233;background-color:#ffffff">Text</span><sub>2</sub><sup>3</sup></p><table><tbody><tr><td>Cell</td></tr></tbody></table><figure><img src="/api/assets/test-image" alt="A descriptive view"><figcaption>Caption</figcaption></figure>');
   for (const expected of ['text-align:center', 'padding-left:40px', 'font-size:18pt', 'font-family:georgia,palatino,serif', '<sub>2</sub>', '<sup>3</sup>', '<td>Cell</td>', 'src="/api/assets/test-image"', 'alt="A descriptive view"', '<figcaption>Caption</figcaption>']) assert.ok(html.includes(expected), expected);

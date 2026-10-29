@@ -20,6 +20,66 @@ img { user-select: none; }
   .button-primary { @apply inline-flex min-h-11 items-center justify-center bg-wine px-7 text-[10px] font-semibold uppercase tracking-editorial text-white transition hover:bg-heading; }
 }
 
+/* Keep published report typography consistent with the journal, regardless of editor styles. */
+.report-body p,
+.report-body p :where(span, a, strong, b, em, i, u, s) {
+  font-family: var(--font-poppins) !important;
+  font-size: 15px !important;
+  line-height: 2rem !important;
+  color: rgb(28 0 7 / .75) !important;
+  background-color: transparent !important;
+  letter-spacing: normal !important;
+  padding-left: 0 !important;
+}
+
+.report-body p {
+  font-weight: 400 !important;
+  font-style: normal !important;
+  text-align: start !important;
+}
+
+.report-body :where(h2, h3, h4, h5, h6) {
+  font-family: var(--font-cormorant) !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+  color: theme('colors.heading') !important;
+  background-color: transparent !important;
+  letter-spacing: normal !important;
+  text-align: start !important;
+  padding-left: 0 !important;
+}
+
+.report-body h2 {
+  font-size: 36px !important;
+  line-height: 40px !important;
+  margin-top: 64px !important;
+  margin-bottom: 38.4001px !important;
+}
+
+.report-body :where(h2, h3, h4, h5, h6) :where(span, a, strong, b, em, i, u, s) {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  color: inherit !important;
+  background-color: transparent !important;
+}
+
+.report-body > p {
+  display: flow-root;
+}
+
+.report-body > p:not(:has(img, video, audio))::first-letter {
+  float: left;
+  margin: 0 12px 0 0;
+  font-family: var(--font-cormorant) !important;
+  font-size: 72px !important;
+  font-weight: 400;
+  line-height: .8 !important;
+  color: theme('colors.heading') !important;
+}
+
 @keyframes registration-backdrop-in {
   from { opacity: 0; }
   to { opacity: 1; }
