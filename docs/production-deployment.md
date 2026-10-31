@@ -26,9 +26,20 @@ The ignored `.env.vercel.local` file contains the production environment values,
 - `EMAIL_FROM`: `Global Luxury Reporter <globalluxuryreporter@gmail.com>`
 - `RATE_LIMIT_IP_HEADER`: `x-vercel-forwarded-for`. Vercel supplies this client-IP header: https://vercel.com/docs/headers/request-headers#x-vercel-forwarded-for
 - `LEGAL_ENTITY_NAME`: `Global Luxury Reporter`; `LEGAL_ADDRESS`: `Mumbai`; `PRIVACY_EMAIL`: `info@readglr.com`, as supplied by the owner.
-- `ROBOTS_INDEXING`: keep `false` for previews; set `true` only for the verified canonical production deployment.
+- `ROBOTS_INDEXING`: `true` for the canonical production deployment; `false` for previews. Preview and development builds are additionally protected by the deployment-environment check, even when the flag is accidentally enabled.
 
 Use separate preview settings so previews are not indexed and do not silently replace production URLs. Never prefix credentials with `NEXT_PUBLIC_`.
+
+## Frontend SEO and indexing
+
+The canonical public origin is `https://readglr.com`. Set `SITE_URL=https://readglr.com` and `ROBOTS_INDEXING=true` in Vercel **Production**, then redeploy; ignored local environment files do not update Vercel settings. An explicit `false` disables indexing. Preview/development builds and a different configured origin remain noindex.
+
+- `/favicon.ico` contains 16px, 32px and 48px variants derived from the existing GLR logo. `/icon.png` is 96px, `/apple-icon.png` is 180px, and `/manifest.webmanifest` references 192px and 512px icons.
+- `/robots.txt` allows public pages and frontend report images. It blocks internal APIs and WordPress-shaped paths. Search and subscription pages retain their existing `noindex` metadata and remain crawlable so crawlers can read that directive.
+- `/sitemap.xml` is generated on request with frontend pages, categories and published reports, including report modification dates. It contains no WordPress/admin URLs. Unpublished reports are excluded by the CMS's existing publication filter.
+- Public pages have canonical and social metadata. The homepage declares the publication and website; reports declare Article and BreadcrumbList structured data. Reports without an excerpt use their title as a description fallback.
+
+After deployment, check that `https://readglr.com/robots.txt` advertises `https://readglr.com/sitemap.xml`, the sitemap is populated, and a published report returns `index, follow` with a `readglr.com` canonical. Submit that sitemap in the verified `readglr.com` Google Search Console property. Search Console ownership, sitemap submission and actual indexing must be confirmed separately; these code changes do not perform them. WordPress configuration and domain/DNS mapping are unchanged.
 
 ## Behaviour preserved
 

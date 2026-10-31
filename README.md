@@ -34,9 +34,11 @@ Import this repository as one Next.js Vercel project. Add these server-side envi
 - `SUBSCRIPTION_SECRET`
 - `RATE_LIMIT_IP_HEADER` set to a header overwritten by the trusted ingress
 - SMTP and sender variables from `.env.example`
-- `ROBOTS_INDEXING=false` until the production smoke test passes
+- `ROBOTS_INDEXING=true` on the canonical Production deployment; `false` on Preview
 
 No `NEXT_PUBLIC_API_URL`, Express/Fastify server, CORS configuration, or second Next.js project is required. The GLR WordPress API requires server authentication; WordPress admin requires its own login.
+
+Production SEO settings, favicon routes and indexing verification are listed in [`docs/production-deployment.md`](docs/production-deployment.md). Sitemap entries and canonical URLs point only to the frontend at `https://readglr.com`.
 
 ## API routes
 

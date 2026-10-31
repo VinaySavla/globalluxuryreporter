@@ -1,6 +1,6 @@
-import { absoluteUrl, siteOrigin } from '@/lib/site';
+import { absoluteUrl, indexingEnabled, siteOrigin } from '@/lib/site';
 
 export default function robots() {
-  if (process.env.ROBOTS_INDEXING !== 'true') return { rules: { userAgent: '*', disallow: '/' } };
-  return { rules: { userAgent: '*', allow: '/', disallow: ['/api/', '/search', '/subscription/'] }, sitemap: absoluteUrl('/sitemap.xml'), host: siteOrigin };
+  if (!indexingEnabled) return { rules: { userAgent: '*', disallow: '/' } };
+  return { rules: { userAgent: '*', allow: ['/', '/api/assets/'], disallow: ['/api/', '/cms/', '/wp-admin/', '/wp-login.php'] }, sitemap: absoluteUrl('/sitemap.xml'), host: siteOrigin };
 }

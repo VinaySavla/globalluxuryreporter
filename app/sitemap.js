@@ -1,8 +1,10 @@
 import { getSitemapContent } from '@/lib/data-service';
-import { absoluteUrl } from '@/lib/site';
+import { absoluteUrl, indexingEnabled } from '@/lib/site';
+
+export const dynamic = 'force-dynamic';
 
 export default async function sitemap() {
-  if (process.env.ROBOTS_INDEXING !== 'true') return [];
+  if (!indexingEnabled) return [];
   const { categories, reports } = await getSitemapContent();
   return [
     { url: absoluteUrl('/'), changeFrequency: 'daily', priority: 1 },

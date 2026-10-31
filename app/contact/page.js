@@ -2,7 +2,7 @@ import { Instagram, Linkedin } from 'lucide-react';
 import SiteShell from '@/components/SiteShell';
 import ContactForm from '@/components/ContactForm';
 
-export const metadata = { title: 'Contact', description: 'Contact the Global Luxury Reporter editorial team.', alternates: { canonical: '/contact' } };
+export const metadata = { title: 'Contact', description: 'Contact the Global Luxury Reporter editorial team.', alternates: { canonical: '/contact' }, openGraph: { title: 'Contact', description: 'Contact the Global Luxury Reporter editorial team.', url: '/contact', siteName: 'Global Luxury Reporter', images: ['/images/jewelry.jpg'] }, twitter: { card: 'summary_large_image', title: 'Contact', description: 'Contact the Global Luxury Reporter editorial team.', images: ['/images/jewelry.jpg'] } };
 
 export default function ContactPage() {
   return (

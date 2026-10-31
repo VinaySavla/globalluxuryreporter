@@ -63,7 +63,7 @@ const pages = {
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   const page = pages[slug];
-  return page ? { title: page.title, description: page.intro, alternates: { canonical: `/information/${slug}` } } : {};
+  return page ? { title: page.title, description: page.intro, alternates: { canonical: `/information/${slug}` }, openGraph: { title: page.title, description: page.intro, url: `/information/${slug}`, siteName: 'Global Luxury Reporter', images: ['/images/jewelry.jpg'] }, twitter: { card: 'summary_large_image', title: page.title, description: page.intro, images: ['/images/jewelry.jpg'] } } : {};
 }
 
 export default async function InformationPage({ params }) {

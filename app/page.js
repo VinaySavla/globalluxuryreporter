@@ -5,6 +5,7 @@ import ReportCard from '@/components/ReportCard';
 import SiteShell from '@/components/SiteShell';
 import { getCategories, getReports } from '@/lib/data-service';
 import { reportMeta } from '@/lib/format';
+import { absoluteUrl } from '@/lib/site';
 
 export default async function HomePage() {
   const [categoryList, reportResult, featuredResult] = await Promise.all([
@@ -17,7 +18,7 @@ export default async function HomePage() {
   const editorPicks = reports.filter((report) => report.editor_pick).slice(0, 4);
   const selectedEditorPicks = editorPicks.length ? editorPicks : reports.slice(0, 4);
   const popular = [...reports].sort((a, b) => b.popularity - a.popularity).slice(0, 5);
-  const structuredData = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Global Luxury Reporter', url: process.env.SITE_URL || 'http://localhost:3000', potentialAction: { '@type': 'SearchAction', target: `${process.env.SITE_URL || 'http://localhost:3000'}/search?q={search_term_string}`, 'query-input': 'required name=search_term_string' } };
+  const structuredData = { '@context': 'https://schema.org', '@graph': [{ '@type': 'WebSite', '@id': absoluteUrl('/#website'), name: 'Global Luxury Reporter', alternateName: 'GLR', url: absoluteUrl('/'), inLanguage: 'en', publisher: { '@id': absoluteUrl('/#publisher') } }, { '@type': 'Organization', '@id': absoluteUrl('/#publisher'), name: 'Global Luxury Reporter', url: absoluteUrl('/'), logo: { '@type': 'ImageObject', url: absoluteUrl('/icons/icon-512.png'), width: 512, height: 512 } }] };
 
   return (
     <SiteShell overlayHeader categories={categoryList}>

@@ -2,7 +2,7 @@ import Image from 'next/image';
 import SiteShell from '@/components/SiteShell';
 import { getCategories } from '@/lib/data-service';
 
-export const metadata = { title: 'Our Mission', description: 'The mission, editorial perspective and global reach of Global Luxury Reporter.', alternates: { canonical: '/about' } };
+export const metadata = { title: 'Our Mission', description: 'The mission, editorial perspective and global reach of Global Luxury Reporter.', alternates: { canonical: '/about' }, openGraph: { title: 'Our Mission', description: 'The mission, editorial perspective and global reach of Global Luxury Reporter.', url: '/about', siteName: 'Global Luxury Reporter', images: ['/images/jewelry.jpg'] }, twitter: { card: 'summary_large_image', title: 'Our Mission', description: 'The mission, editorial perspective and global reach of Global Luxury Reporter.', images: ['/images/jewelry.jpg'] } };
 
 export default async function AboutPage() {
   const categories = await getCategories();

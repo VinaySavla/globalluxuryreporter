@@ -1,3 +1,3 @@
 export default function manifest() {
-  return { name: 'Global Luxury Reporter', short_name: 'GLR', description: 'Independent reporting on global luxury.', start_url: '/', display: 'standalone', background_color: '#fffaf5', theme_color: '#1c0007', icons: [{ src: '/GLR-Logo-dp.png', sizes: '96x96', type: 'image/png' }] };
+  return { id: '/', name: 'Global Luxury Reporter', short_name: 'GLR', lang: 'en', description: 'Independent reporting on global luxury.', start_url: '/', scope: '/', display: 'standalone', background_color: '#ffffff', theme_color: '#6b0f22', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }] };
 }

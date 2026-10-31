@@ -13,10 +13,10 @@ export async function generateMetadata({ params }) {
   const report = await getReport(slug);
   return report ? {
     title: report.title,
-    description: report.excerpt,
+    description: report.excerpt || report.title,
     alternates: { canonical: `/reports/${report.slug}` },
-    openGraph: { type: 'article', url: `/reports/${report.slug}`, title: report.title, description: report.excerpt, publishedTime: report.published_at, modifiedTime: report.date_updated || report.published_at, authors: [report.author], images: report.cover_image ? [{ url: report.cover_image, alt: report.cover_alt || report.title }] : [] },
-    twitter: { card: report.cover_image ? 'summary_large_image' : 'summary', title: report.title, description: report.excerpt, images: report.cover_image ? [report.cover_image] : [] }
+    openGraph: { type: 'article', locale: 'en_US', siteName: 'Global Luxury Reporter', url: `/reports/${report.slug}`, title: report.title, description: report.excerpt || report.title, publishedTime: report.published_at, modifiedTime: report.date_updated || report.published_at, authors: [report.author], section: report.category?.name, images: report.cover_image ? [{ url: report.cover_image, alt: report.cover_alt || report.title }] : [{ url: '/icons/icon-512.png', alt: 'Global Luxury Reporter' }] },
+    twitter: { card: report.cover_image ? 'summary_large_image' : 'summary', title: report.title, description: report.excerpt || report.title, images: report.cover_image ? [report.cover_image] : ['/icons/icon-512.png'] }
   } : { title: 'Report not found', robots: { index: false, follow: false } };
 }
 
@@ -29,17 +29,22 @@ export default async function ReportPage({ params }) {
   if (related.length < 3) related = (await getReports({ limit: 8 })).data.filter((item) => item.slug !== report.slug).slice(0, 3);
   const date = formatReportDate(report.published_at);
   const structuredData = {
-    '@context': 'https://schema.org', '@type': 'Article', headline: report.title, description: report.excerpt,
+    '@context': 'https://schema.org', '@type': 'Article', headline: report.title, description: report.excerpt || report.title, inLanguage: 'en', articleSection: report.category?.name, isAccessibleForFree: true,
     ...(report.cover_image ? { image: [absoluteUrl(report.cover_image)] } : {}), datePublished: report.published_at, dateModified: report.date_updated || report.published_at,
     author: { '@type': 'Person', name: report.author },
-    publisher: { '@type': 'Organization', name: 'Global Luxury Reporter', logo: { '@type': 'ImageObject', url: absoluteUrl('/GLR-Logo-dp.png') } },
+    publisher: { '@type': 'Organization', '@id': absoluteUrl('/#publisher'), name: 'Global Luxury Reporter', url: absoluteUrl('/'), logo: { '@type': 'ImageObject', url: absoluteUrl('/icons/icon-512.png'), width: 512, height: 512 } },
     mainEntityOfPage: absoluteUrl(`/reports/${report.slug}`)
   };
+  const breadcrumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/') },
+    ...(report.category?.slug ? [{ '@type': 'ListItem', position: 2, name: report.category.name, item: absoluteUrl(`/categories/${report.category.slug}`) }] : []),
+    { '@type': 'ListItem', position: report.category?.slug ? 3 : 2, name: report.title, item: absoluteUrl(`/reports/${report.slug}`) }
+  ] };
 
   return (
     <SiteShell>
       <main id="main-content">
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify([structuredData, breadcrumbs]).replace(/</g, '\\u003c') }} />
         <header className="editorial-container py-14 text-center sm:py-20 lg:py-24">
           <nav className="flex items-center justify-center gap-2 text-[9px] uppercase tracking-editorial text-ink/45"><Link href="/">Home</Link><span>/</span><Link href={`/categories/${report.category?.slug}`}>{report.category?.name}</Link></nav>
           <p className="eyebrow mt-9 text-heading">{report.category?.name}</p>
