@@ -14,12 +14,15 @@ The WordPress token is read only by server code and is never included in the bro
 
 ## Local development
 
+Use Node.js 22.12 or newer. The sanitizer requires this minimum; CI uses Node 22.
+
 1. Copy `.env.example` to `.env.local`.
 2. Run `npm install`.
 3. Run `npm run dev`.
 4. Open `http://localhost:3000`.
 
 Development and production both use WordPress. CMS operation details are in [`wordpress/README.md`](wordpress/README.md).
+The `postcss-selector-parser` override keeps the typography plugin on the patched 6.x parser without downgrading its styles. Keep the audit step enabled when updating the lockfile.
 The full request flow, security model, and deployment checklist are documented in [`docs/backend-architecture.md`](docs/backend-architecture.md).
 
 ## Deploy to Vercel
