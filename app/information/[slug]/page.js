@@ -29,9 +29,10 @@ const pages = {
     sections: [
       ['Information we collect', 'GLR collects the name, email address and message you submit through the contact form; the email address and confirmation records you submit for editorial updates; and limited security records such as a one-way hash derived from the network address used to submit a form.'],
       ['How we use it', 'Contact information is used to respond to inquiries. Subscription information is used only after email confirmation to deliver requested editorial updates, maintain an unsubscribe record and protect the service against abuse. GLR does not sell personal information.'],
+      ['Website analytics', <>GLR uses Vercel Web Analytics to understand readership without analytics cookies. If you accept analytics cookies, Google Analytics also measures page views. GLR removes query strings and fragments from tracked page URLs and excludes subscription and internal pages. Advertising signals are disabled. See <a href="https://policies.google.com/technologies/partner-sites" className="underline" target="_blank" rel="noopener noreferrer">how Google uses information from sites that use its services</a>. Change your choice using Analytics preferences in the footer.</>],
       ['Legal basis and choices', 'GLR processes contact inquiries to respond to your request and processes editorial email registrations with your affirmative consent. You may withdraw email consent at any time using the unsubscribe link in an email.'],
       ['Retention', 'Unconfirmed registrations expire after 24 hours and should be deleted during routine maintenance. Contact inquiries are retained for up to 24 months unless a longer period is needed for an active matter or legal obligation. Active subscriber records are retained while subscribed; minimal suppression records may be retained to respect opt-outs.'],
-      ['Service providers and transfers', 'Hosting, database and email-delivery providers process information for GLR under contractual instructions. Their locations may involve international transfers, for which GLR will use an applicable transfer safeguard. The current provider list should be completed before production launch.'],
+      ['Service providers and transfers', 'GLR uses Vercel for frontend hosting and cookie-free web analytics, Hostinger for its private editorial backend, and Google for email delivery and consent-based Google Analytics. These providers may process information internationally.'],
       ['Your rights', 'Depending on your location, you may request access, correction, deletion, restriction, portability or objection, and may complain to your local data-protection authority. Email info@readglr.com to make a request. GLR may need to verify your identity.'],
       ['Contact', `The website is operated by ${legalEntityName}, ${legalAddress}. For privacy questions, requests or complaints, email ${privacyEmail}.`]
     ]
@@ -50,10 +51,11 @@ const pages = {
   },
   cookies: {
     title: 'Cookie Policy',
-    intro: 'The public GLR website currently does not intentionally use advertising, analytics or personalization cookies.',
+    intro: 'GLR uses cookie-free Vercel Web Analytics and offers optional Google Analytics cookies to understand readership.',
     sections: [
       ['Essential technology', 'The hosting platform may use strictly necessary security or load-balancing technology to deliver and protect the service. Such technology is not used by GLR for advertising.'],
-      ['Future changes', 'GLR will update this notice and, where required, request consent before enabling non-essential analytics, advertising or personalization technologies.'],
+      ['Google Analytics cookies', 'Google Analytics loads only after you choose Accept analytics. It can set _ga cookies to measure visits and engagement. GLR does not enable Google advertising signals or advertising personalization.'],
+      ['Your choice', 'Choose Accept analytics or Decline in the analytics notice. Reopen Analytics preferences in the footer to change your choice. Declining stops Google Analytics, removes its accessible first-party _ga cookies and reloads the page if the tag was already active. Your preference is stored locally in this browser.'],
       ['Browser controls', 'You can use browser settings to inspect, block or delete stored website data. Blocking strictly necessary technology may affect service operation.'],
       ['Contact', 'Questions about website tracking may be sent to info@readglr.com.']
     ]
@@ -70,5 +72,5 @@ export default async function InformationPage({ params }) {
   const { slug } = await params;
   const page = pages[slug];
   if (!page) notFound();
-  return <SiteShell><main id="main-content" className="editorial-container py-16 sm:py-24"><article className="mx-auto max-w-3xl"><p className="eyebrow text-heading">GLR information</p><h1 className="hero-title mt-4 text-heading">{page.title}</h1><p className="mt-6 text-base leading-8 text-ink/80">{page.intro}</p><p className="mt-3 text-xs uppercase tracking-wider text-ink/65">Last updated 11 September 2026</p><div className="mt-12 space-y-10">{page.sections.map(([title, content]) => <section key={title}><h2 className="font-serif text-3xl text-heading">{title}</h2><p className="mt-4 text-sm leading-7 text-ink/75">{content}</p></section>)}</div></article></main></SiteShell>;
+  return <SiteShell><main id="main-content" className="editorial-container py-16 sm:py-24"><article className="mx-auto max-w-3xl"><p className="eyebrow text-heading">GLR information</p><h1 className="hero-title mt-4 text-heading">{page.title}</h1><p className="mt-6 text-base leading-8 text-ink/80">{page.intro}</p><p className="mt-3 text-xs uppercase tracking-wider text-ink/65">Last updated {['privacy', 'cookies'].includes(slug) ? '31 October 2026' : '11 September 2026'}</p><div className="mt-12 space-y-10">{page.sections.map(([title, content]) => <section key={title}><h2 className="font-serif text-3xl text-heading">{title}</h2><p className="mt-4 text-sm leading-7 text-ink/75">{content}</p></section>)}</div></article></main></SiteShell>;
 }

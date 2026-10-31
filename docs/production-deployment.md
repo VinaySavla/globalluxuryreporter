@@ -32,6 +32,14 @@ Use separate preview settings so previews are not indexed and do not silently re
 
 ## Frontend SEO and indexing
 
+### Analytics
+
+Vercel Web Analytics is installed in the root layout. Its project setting is enabled in Vercel separately. The Google Analytics stream for `https://readglr.com` is `G-S2R2KWQNS7`, created under `globalluxuryreporter@gmail.com`. This public ID is the frontend default; `NEXT_PUBLIC_GA_MEASUREMENT_ID` can override it at build time. It is not a credential. Deploy the updated source to activate these integrations. Development and Preview do not load the trackers.
+
+Google Analytics loads only after the visitor accepts analytics. Preferences can be reopened from the footer; declining removes accessible first-party Google Analytics cookies and stops the tag. Vercel Analytics is cookie-free. Both integrations remove query strings/fragments from tracked URLs and exclude subscription, API and CMS paths. Google advertising signals are disabled.
+
+Turn off **Enhanced measurement** on the Google web stream: the frontend sends one sanitized `page_view` per route, so automatic history/form/search events must not duplicate those events or include raw query strings. Confirm events on the real domain after deployment in Google Realtime and Vercel Analytics; local tests do not establish live collection.
+
 The canonical public origin is `https://readglr.com`. Set `SITE_URL=https://readglr.com` and `ROBOTS_INDEXING=true` in Vercel **Production**, then redeploy; ignored local environment files do not update Vercel settings. An explicit `false` disables indexing. Preview/development builds and a different configured origin remain noindex.
 
 - `/favicon.ico` contains 16px, 32px and 48px variants derived from the existing GLR logo. `/icon.png` is 96px, `/apple-icon.png` is 180px, and `/manifest.webmanifest` references 192px and 512px icons.

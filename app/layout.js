@@ -1,5 +1,6 @@
 import { Cormorant_Garamond, Poppins } from 'next/font/google';
 import EmailRegistrationModal from '@/components/EmailRegistrationModal';
+import WebsiteAnalytics from '@/components/WebsiteAnalytics';
 import { indexingEnabled, siteUrl } from '@/lib/site';
 import './globals.css';
 
@@ -24,5 +25,5 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
-  return <html lang="en"><body className={`${cormorant.variable} ${poppins.variable} font-sans text-ink antialiased`}><a href="#main-content" className="skip-link">Skip to main content</a>{children}<EmailRegistrationModal /></body></html>;
+  return <html lang="en"><body className={`${cormorant.variable} ${poppins.variable} font-sans text-ink antialiased`}><a href="#main-content" className="skip-link">Skip to main content</a>{children}<EmailRegistrationModal /><WebsiteAnalytics enabled={process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV !== 'preview'} /></body></html>;
 }

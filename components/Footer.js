@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Instagram, Linkedin } from 'lucide-react';
 import OpenRegistrationButton from './OpenRegistrationButton';
+import { AnalyticsPreferencesButton } from './WebsiteAnalytics';
 
 const editorialLinks = [
   ['Explore', [['Travel & Experiences', '/categories/travel'], ['Fashion & Style', '/categories/fashion'], ['Design', '/categories/design'], ['Wellness', '/categories/wellness'], ['Automotive', '/categories/automotive'], ['Culture', '/categories/culture']]],
@@ -48,7 +49,7 @@ export default function Footer() {
 
         <div className="mt-8 flex flex-col gap-2 border-t border-white/15 pt-5 text-[8px] uppercase tracking-editorial sm:mt-12 sm:flex-row sm:justify-between sm:text-[9px]">
           <span>© 2026 Global Luxury Reporter</span>
-          <span>Global coverage · Independent perspective</span>
+          <span><AnalyticsPreferencesButton /></span><span>Global coverage · Independent perspective</span>
         </div>
       </div>
     </footer>
