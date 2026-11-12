@@ -6,7 +6,7 @@
 - WordPress backend: `https://marketing.readglr.com/cms`.
 - WordPress admin: `https://marketing.readglr.com/cms/wp-admin/`.
 
-The CMS domain connection and HTTPS were verified on 24 October 2026. Both WordPress URL settings use HTTPS, and the existing GLR database `u353810860_BViHU` and administrator password were preserved. The root domain belongs to the Vercel frontend; its final connection remains part of the owner's deployment. Preserve unrelated Hostinger sites and existing DNS records.
+The CMS domain connection and HTTPS were verified on 24 October 2026. Both WordPress URL settings use HTTPS, and the existing GLR database `u353810860_BViHU` and administrator password were preserved. The root domain serves the Vercel frontend over HTTPS. Preserve unrelated Hostinger sites and existing DNS records.
 
 The former GLR CMS was retired on 24 October 2026: its dedicated container/network and scheduled backup job were removed from active service, its configuration/files were moved into a private recovery backup, and its old database was deleted after confirmation. The former hostname returns HTTP 410. WordPress is the only active GLR backend. Verified recovery copies are kept outside this repository; unrelated server applications and Hostinger resources were preserved.
 
@@ -49,6 +49,17 @@ The canonical public origin is `https://readglr.com`. Set `SITE_URL=https://read
 
 After deployment, check that `https://readglr.com/robots.txt` advertises `https://readglr.com/sitemap.xml`, the sitemap is populated, and a published report returns `index, follow` with a `readglr.com` canonical. Submit that sitemap in the verified `readglr.com` Google Search Console property. Search Console ownership, sitemap submission and actual indexing must be confirmed separately; these code changes do not perform them. WordPress configuration and domain/DNS mapping are unchanged.
 
+## Production checklist — 12 November 2026
+
+- [x] Canonical frontend: `https://readglr.com/` serves the site on Vercel, and HTTP redirects to HTTPS. The Vercel fallback hostname was observed with `noindex, nofollow`.
+- [x] Crawl and discovery: live robots.txt advertises sitemap.xml; the sitemap returned 39 canonical frontend URLs, including 24 reports. Homepage and a published report allow indexing and declare canonical URLs. Search declares noindex. RSS and favicon return 200.
+- [x] CMS connectivity: the public frontend health check reports WordPress is reachable. Keep the backend on its separate existing hostname.
+- [x] Analytics reporting scope: compare Vercel **Page Views**, filtered to Production and `readglr.com`, with GA4 **Views** over the same completed dates. Vercel can measure visits without the GA4 opt-in. GA4 starts after acceptance, can be blocked by browser privacy tools, and has a different reporting cutoff. The totals are not expected to match; keep the opt-in and do not backfill missing views.
+- [ ] Deploy the frontend verification tag. In Search Console under `globalluxuryreporter@gmail.com`, verify the **URL-prefix** property `https://readglr.com/` using **HTML tag**. Keep the tag after verification. Submit `sitemap.xml` in Sitemaps, confirm **Success**, then use URL Inspection on the homepage and a published report. Verification and sitemap acceptance do not guarantee indexing.
+- [ ] Fix the optional `www.readglr.com` alias. It currently points at Hostinger CDN and fails certificate validation. If the alias should work, add it to the existing Vercel frontend project as a redirect to `readglr.com`, set only the `www` DNS record to Vercel's project-provided target, and verify HTTPS and the redirect. Leave the apex, mail, and `marketing` records intact.
+- [ ] After deploying the Google Analytics connection policy update, verify collection in GA4 Realtime with analytics accepted and a browser without tracking blockers. Confirm one `page_view` per public navigation and no GA4 tracking after declining. Compare completed dates once both dashboards have processed them.
+- [ ] Run a production subscribe, confirm and unsubscribe cycle with an approved test address. Confirm CMS backups cover the database and private media and test a restore separately.
+
 ## Behaviour preserved
 
 The Next.js design, report URLs and browser API endpoints are unchanged. WordPress is the only CMS and owns all editorial data. The WordPress administrator password must remain unchanged.
@@ -65,6 +76,6 @@ Backups must include both the WordPress database and `glr-private-media` outside
 
 ## Checks after the owner's Vercel deployment
 
-Connect `readglr.com` to the intended Vercel project using the exact DNS values supplied by that project, while retaining the separate `marketing` backend record. Verify `/api/health`, homepage, category pages, reports, search, images, sitemap, RSS and a complete subscribe/confirm/unsubscribe cycle on the real production domain. The local checks cannot establish that a future Vercel deployment has the correct environment or DNS.
+After each production deployment, smoke test `/api/health`, homepage, a category and report, search, images, sitemap and RSS on the real production domain.
 
 The GLR plugin's media toolbar is live, but the expanded audio/video HTML allowlist, document links and byte-range proxy are frontend source changes. Deploy the updated Next.js project before relying on audio/video playback and file downloads on the public site. After deployment, check playback and seeking plus a document download from an owner-approved published report.

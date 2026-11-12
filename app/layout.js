@@ -13,6 +13,7 @@ export const metadata = {
   description: 'Independent reporting on the people, places and ideas shaping global luxury.',
   applicationName: 'Global Luxury Reporter',
   manifest: '/manifest.webmanifest',
+  verification: indexingEnabled ? { google: 'BTgY4gWkAmVphQY8-sI62MhYT7Wo04AVeGltVjjC9pU' } : undefined,
   category: 'Luxury lifestyle and culture',
   alternates: { canonical: '/', types: { 'application/rss+xml': [{ url: '/feed.xml', title: 'Global Luxury Reporter' }] } },
   openGraph: {
